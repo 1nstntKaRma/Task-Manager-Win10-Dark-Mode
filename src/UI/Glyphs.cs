@@ -142,5 +142,30 @@ namespace TaskManagerDark
             }
             g.SmoothingMode = old;
         }
+        /// <summary>5-pointed star used by the "Set default tab" button on the right side of the tab bar.</summary>
+        public static void DefaultTabStar(Graphics g, RectangleF r, bool filled, Color c)
+        {
+            var old = g.SmoothingMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float cx = r.X + r.Width / 2f, cy = r.Y + r.Height / 2f + r.Height * 0.03f;
+            float ro = r.Width * 0.48f, ri = ro * 0.40f;
+            var pts = new PointF[10];
+            for (int i = 0; i < 10; i++)
+            {
+                double a = -Math.PI / 2.0 + i * Math.PI / 5.0;
+                float rad = (i % 2 == 0) ? ro : ri;
+                pts[i] = new PointF(cx + (float)(Math.Cos(a) * rad), cy + (float)(Math.Sin(a) * rad));
+            }
+            if (filled)
+            {
+                using (var b = new SolidBrush(c)) g.FillPolygon(b, pts);
+            }
+            else
+            {
+                using (var pen = new Pen(c, Math.Max(1.1f, r.Width / 10f)) { LineJoin = LineJoin.Round })
+                    g.DrawPolygon(pen, pts);
+            }
+            g.SmoothingMode = old;
+        }
     }
 }

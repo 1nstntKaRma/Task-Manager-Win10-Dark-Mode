@@ -73,11 +73,23 @@ function Test-HasSource {
     return ($csCount -gt 0)
 }
 
+function Show-BuildSummary {
+    $size = [math]::Round((Get-Item -LiteralPath $exe).Length / 1KB)
+    $lsize = [math]::Round((Get-Item -LiteralPath $launcherExe).Length / 1KB)
+    Write-Host 'Task Manager - Dark Mode Build path:' -ForegroundColor Green
+    Write-Host "`"$bin`"" -ForegroundColor Green
+    Write-Host "$(Split-Path $exe -Leaf) ($size KB) & $(Split-Path $launcherExe -Leaf) ($lsize KB)" -ForegroundColor Green
+    if ((Test-Path $InstallMarker) -and (Test-Path $InstalledExe)) {
+        $same = (Get-FileHash $exe).Hash -eq (Get-FileHash $InstalledExe).Hash
+        if (-not $same) { Write-Host "  The installed copy in $InstallDir is older. Choose Apply Dark Mode (or -Shell Apply) to update it." -ForegroundColor Yellow }
+    }
+}
+
 # ======================================================================================= build
 function Invoke-Build {
     if (-not (Test-HasSource)) {
         if ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $launcherExe)) {
-            Write-Host "Using pre-built binaries in $bin" -ForegroundColor Green
+            Show-BuildSummary
             return
         }
         throw "No source files found in '$src' and pre-built binaries were not found in '$bin'. Make sure you extracted the entire zip archive before running build.ps1."
@@ -88,7 +100,7 @@ function Invoke-Build {
         Sort-Object { [version]($_.FullName -replace '.*\\sdk\\([\d\.]+)[^\\]*\\.*', '$1') } -Descending | Select-Object -First 1
     if (-not $csc) {
         if ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $launcherExe)) {
-            Write-Host "No .NET SDK found; using existing pre-built binaries in $bin" -ForegroundColor Yellow
+            Show-BuildSummary
             return
         }
         throw 'No .NET SDK found (needed only to build from source; download the pre-built Release zip if you do not have the .NET SDK installed).'
@@ -129,13 +141,7 @@ function Invoke-Build {
     $launcherRefs = @('mscorlib.dll', 'System.dll') | ForEach-Object { "-r:$fw\$_" }
     Compile $launcherExe (Join-Path $root 'launcher\launcher.manifest') $launcherSrc $launcherRefs @("-win32icon:$ico")
 
-    $size = [math]::Round((Get-Item $exe).Length / 1KB)
-    $lsize = [math]::Round((Get-Item $launcherExe).Length / 1KB)
-    Write-Host "Built $exe ($size KB) and $(Split-Path $launcherExe -Leaf) ($lsize KB) with $($csc.Directory.Parent.Parent.Name)" -ForegroundColor Green
-    if ((Test-Path $InstallMarker) -and (Test-Path $InstalledExe)) {
-        $same = (Get-FileHash $exe).Hash -eq (Get-FileHash $InstalledExe).Hash
-        if (-not $same) { Write-Host "  The installed copy in $InstallDir is older. Choose Apply Dark Mode (or -Shell Apply) to update it." -ForegroundColor Yellow }
-    }
+    Show-BuildSummary
 }
 
 # ======================================================================================= helpers
@@ -320,7 +326,7 @@ function Invoke-Integration([string]$mode) {
             Install-Task $sid
             Set-Ifeo
             Say ''
-            Say '[OK] Operation completed successfully: Task Manager Dark Mode is now active (Ctrl+Shift+Esc, Ctrl+Alt+Del, taskbar, and "taskmgr").' 'Green'
+            Say '[OK] Operation completed successfully: Task Manager Dark Mode is active (Ctrl+Shift+Esc)' 'Green'
         }
         'Revert' {
             Say 'System integration -> the original Windows Task Manager' 'Cyan'
@@ -328,7 +334,7 @@ function Invoke-Integration([string]$mode) {
             Remove-Task
             Remove-Files
             Say ''
-            Say '[!] Operation completed successfully: Reverted to the original Windows Task Manager.' 'DarkYellow'
+            Say '[OK] Operation completed successfully: Reverted to the original Windows Task Manager.' 'DarkYellow'
         }
         'Clean' {
             Say 'System integration -> removing every change made by this script' 'Cyan'
@@ -337,7 +343,7 @@ function Invoke-Integration([string]$mode) {
             Remove-Files
             Stop-EtwSession
             Say ''
-            Say '[!] Operation completed successfully: System restored to Windows defaults.' 'DarkYellow'
+            Say '[OK] Operation completed successfully: System restored to Windows defaults.' 'DarkYellow'
         }
     }
 }
@@ -397,10 +403,10 @@ try {
         if (Test-Interactive) {
             Show-Windows11Note
             $choices = [System.Management.Automation.Host.ChoiceDescription[]]@(
-                (New-Object System.Management.Automation.Host.ChoiceDescription '&Apply Dark Mode', 'Ctrl+Shift+Esc and every "Task Manager" entry point open Task Manager Dark (asks for administrator permission once).'),
+                (New-Object System.Management.Automation.Host.ChoiceDescription '&Apply Dark Mode', 'Any task that calls "Task Manager" will now use the new Dark Mode variant (asks for administrator permission once).'),
                 (New-Object System.Management.Automation.Host.ChoiceDescription '&Revert', 'Restore the original Windows Task Manager (removes only what this script added).'),
                 (New-Object System.Management.Automation.Host.ChoiceDescription 'A&bort', 'Exit without changing anything.'))
-            $msg = "`n  Apply Dark Mode - Ctrl+Shift+Esc, Ctrl+Alt+Del and the taskbar open Task Manager Dark (elevated, no prompt)`n" +
+            $msg = "`n  Apply Dark Mode - Any task that calls `"Task Manager`" will now use the new Dark Mode variant.`n" +
                    "  Revert          - Restore the original Windows Task Manager`n" +
                    "  Abort           - Exit without changing anything`n"
             $pick = $Host.UI.PromptForChoice('Task Manager', $msg, $choices, 2)

@@ -51,6 +51,7 @@ namespace TaskManagerDark
             Tabs = new TabStrip();
             Tabs.Tabs.AddRange(TabNames);
             Tabs.SelectedChanged += i => ShowPage(i);
+            Tabs.DefaultTabChanged += i => { DefaultTab = i; Settings.SetInt("DefaultTab", i); Settings.Save(); };
             Bar = new CommandBar();
             Bar.ToggleClicked += () => SetFewerDetails(true);
             Bar.ButtonClicked += () => CurrentPage?.CommandButton();
@@ -520,6 +521,7 @@ namespace TaskManagerDark
             ShowFullAccountName = Settings.GetBool("ShowFullAccountName", false);
             ShowHistoryAllProcesses = Settings.GetBool("ShowHistoryAllProcesses", false);
             DefaultTab = Math.Max(0, Math.Min(6, Settings.GetInt("DefaultTab", 0)));
+            if (Tabs != null) Tabs.DefaultTab = DefaultTab;
             UpdateSpeed = Math.Max(0, Math.Min(3, Settings.GetInt("UpdateSpeed", 1)));
             ShowSuspendedStatus = Settings.GetBool("ShowSuspendedStatus", true);
             _fewerDetails = Settings.GetBool("FewerDetails", false);

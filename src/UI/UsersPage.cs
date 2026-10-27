@@ -13,6 +13,7 @@ namespace TaskManagerDark
         {
             public int Session; public string Account, Domain, Display, Station, Client; public int State;
             public double Cpu, Disk, Net, Gpu; public long Memory; public int ProcCount;
+            public bool InitialExpanded;
         }
 
         readonly TreeList _list = new TreeList { TallHeader = true, RowHeightLogical = 24 };
@@ -156,6 +157,7 @@ namespace TaskManagerDark
                 if (u.Cpu > 100) u.Cpu = 100;
                 u.Icon = _userIcon;
                 u.Children = kids;
+                if (!u.InitialExpanded && u.Expandable) { u.InitialExpanded = true; _list.SetExpanded(u, true); }
                 SortRows(kids);
                 roots.Add(u);
             }

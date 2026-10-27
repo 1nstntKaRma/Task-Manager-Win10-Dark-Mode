@@ -142,8 +142,10 @@ namespace TaskManagerDark
     {
         public readonly List<string> Tabs = new List<string>();
         readonly List<Rectangle> _rects = new List<Rectangle>();
-        int _selected, _hot = -1;
+        int _selected, _defaultTab, _hot = -1;
+        bool _hotDefault, _downDefault;
         public event Action<int> SelectedChanged;
+        public event Action<int> DefaultTabChanged;
         public int PreferredHeight => D.S(25);
 
         public int Selected
@@ -151,6 +153,15 @@ namespace TaskManagerDark
             get => _selected;
             set { if (value == _selected || value < 0 || value >= Tabs.Count) return; _selected = value; Invalidate(); SelectedChanged?.Invoke(value); }
         }
+
+        public int DefaultTab
+        {
+            get => _defaultTab;
+            set { if (value == _defaultTab || value < 0 || value >= Tabs.Count) return; _defaultTab = value; Invalidate(); }
+        }
+
+        Rectangle DefaultBtnRect => new Rectangle(Width - D.S(23), D.S(2), D.S(19), Height - D.S(4));
+        bool ShowDefaultBtn => _rects.Count == 0 || DefaultBtnRect.Left > _rects[_rects.Count - 1].Right + D.S(4);
 
         void LayoutTabs()
         {
@@ -192,13 +203,103 @@ namespace TaskManagerDark
                     Draw.Text(g, Tabs[i], f, new Rectangle(r.X, r.Y + D.S(1), r.Width, r.Height - D.S(1)), i == _hot ? Theme.Text : Theme.TabText, Draw.TextCenter);
                 }
             }
+
+            if (ShowDefaultBtn)
+            {
+                var br = DefaultBtnRect;
+                bool isDef = _selected == _defaultTab;
+                if (_hotDefault || isDef)
+                {
+                    Color bg = _downDefault ? Theme.Pressed : _hotDefault ? (isDef ? Theme.CheckedHover : Theme.TabHover) : Theme.Checked;
+                    Color bd = isDef ? Theme.CheckedBorder : Theme.Border;
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    using (var p = Draw.RoundRect(new RectangleF(br.X + 0.5f, br.Y + 0.5f, br.Width - 1, br.Height - 1), D.F(3)))
+                    {
+                        g.FillPath(Theme.Brush(bg), p);
+                        g.DrawPath(Theme.Pen(bd), p);
+                    }
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                }
+                float isz = D.S(13);
+                var ir = new RectangleF(br.X + (br.Width - isz) / 2f, br.Y + (br.Height - isz) / 2f, isz, isz);
+                Color ic = isDef ? Theme.Link : (_hotDefault ? Theme.Text : Theme.TabText);
+                Glyphs.DefaultTabStar(g, ir, isDef, ic);
+            }
         }
 
         int Hit(Point p) { for (int i = 0; i < _rects.Count; i++) if (_rects[i].Contains(p)) return i; return -1; }
+        bool HitDefaultBtn(Point p) => ShowDefaultBtn && DefaultBtnRect.Contains(p);
 
-        protected override void OnMouseMove(MouseEventArgs e) { base.OnMouseMove(e); int h = Hit(e.Location); if (h != _hot) { _hot = h; Invalidate(); } }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _hot = -1; Invalidate(); }
-        protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { int h = Hit(e.Location); if (h >= 0) Selected = h; } }
+        void ShowDefaultTip()
+        {
+            if (_selected < 0 || _selected >= Tabs.Count) return;
+            bool isDef = _selected == _defaultTab;
+            string tabName = Tabs[_selected];
+            string title = isDef ? "Default startup tab (" + tabName + ")" : "Set \"" + tabName + "\" as default tab";
+            string desc = isDef ? "Task Manager opens to this tab on startup." : "Click to open Task Manager to \"" + tabName + "\" on startup.";
+            var br = DefaultBtnRect;
+            Tips.Request("deftab:" + _selected + ":" + _defaultTab, title, desc, PointToScreen(new Point(br.Left, br.Bottom + D.S(4))), D.Value);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            bool hd = HitDefaultBtn(e.Location);
+            int h = hd ? -1 : Hit(e.Location);
+            Cursor = hd ? Cursors.Hand : Cursors.Default;
+            if (hd != _hotDefault || h != _hot)
+            {
+                _hotDefault = hd;
+                _hot = h;
+                Invalidate();
+            }
+            if (hd) ShowDefaultTip();
+            else Tips.Hide();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hot = -1;
+            _hotDefault = false;
+            _downDefault = false;
+            Cursor = Cursors.Default;
+            Tips.Hide();
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (e.Button != MouseButtons.Left) return;
+            if (HitDefaultBtn(e.Location))
+            {
+                _downDefault = true;
+                Invalidate();
+                return;
+            }
+            int h = Hit(e.Location);
+            if (h >= 0) Selected = h;
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            bool wasDown = _downDefault;
+            _downDefault = false;
+            if (wasDown)
+            {
+                Invalidate();
+                if (e.Button == MouseButtons.Left && HitDefaultBtn(e.Location))
+                {
+                    _defaultTab = _selected;
+                    Invalidate();
+                    DefaultTabChanged?.Invoke(_defaultTab);
+                    Tips.Hide();
+                    ShowDefaultTip();
+                }
+            }
+        }
     }
 
     /// <summary>Bottom bar: "Fewer details" / "More details" on the left, the page's command button or link on the right.</summary>

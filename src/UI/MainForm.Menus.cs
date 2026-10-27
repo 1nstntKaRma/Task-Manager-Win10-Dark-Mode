@@ -25,7 +25,7 @@ namespace TaskManagerDark
             for (int i = 0; i < 7; i++)
             {
                 int t = i;
-                tabs.Add(MenuItem.RadioItem(labels[i], () => DefaultTab == t, () => { DefaultTab = t; Settings.SetInt("DefaultTab", t); Settings.Save(); }));
+                tabs.Add(MenuItem.RadioItem(labels[i], () => DefaultTab == t, () => { DefaultTab = t; Tabs.DefaultTab = t; Settings.SetInt("DefaultTab", t); Settings.Save(); }));
             }
             return new List<MenuItem>
             {
