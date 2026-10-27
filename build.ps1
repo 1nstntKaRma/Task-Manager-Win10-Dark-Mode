@@ -67,7 +67,24 @@ function Start-ExitCountdown([int]$seconds = 3, [string]$color = 'Gray') {
 }
 
 function Exit-Session([int]$code = 0) {
-    if (Test-Interactive) {
+    if (Test-Interactive -and -not $Elevated) {
+        try {
+            $self = Get-CimInstance Win32_Process -Filter "ProcessId = $PID" -ErrorAction SilentlyContinue
+            if ($self -and $self.ParentProcessId) {
+                $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $($self.ParentProcessId)" -ErrorAction SilentlyContinue
+                if ($parent -and $parent.Name -match '^(powershell|pwsh|cmd)(\.exe)?$') {
+                    $parentPid = [int]$parent.ProcessId
+                    $tempRoot = [System.IO.Path]::GetTempPath().TrimEnd('\')
+                    $cleanCmd = ""
+                    if ($root.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $escapedRoot = $root.Replace("'", "''")
+                        $cleanCmd = "Remove-Item -LiteralPath '$escapedRoot' -Recurse -Force -ErrorAction SilentlyContinue; "
+                    }
+                    $killScript = "Start-Sleep -Milliseconds 250; $cleanCmd Stop-Process -Id $parentPid -Force -ErrorAction SilentlyContinue"
+                    Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-WindowStyle', 'Hidden', '-Command', $killScript) -WorkingDirectory $tempRoot -WindowStyle Hidden | Out-Null
+                }
+            }
+        } catch {}
         try { $Host.SetShouldExit($code) } catch {}
         [Environment]::Exit($code)
     }

@@ -2,7 +2,7 @@
 
 > **🛠️⚙️ Windows 10 - Task Manager  Dark Mode ⚡ Full replacement.**
 
-![Version](https://img.shields.io/badge/version-v1.25-blue)
+![Version](https://img.shields.io/badge/version-v1.35-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010-0078D6)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8%20(built--in)-512BD4)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -30,7 +30,7 @@ Windows 10's built-in Task Manager has no dark theme. This replaces it system-wi
 
 ### Option 1: Download Pre-Built Release (Recommended)
 
-1. Download **`TaskManagerDark-v1.25.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
+1. Download **`TaskManagerDark-v1.35.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
 2. Double-click **`Activate Task Manager Dark.cmd`** (or run `build.ps1` and choose **Apply Dark Mode**) to make it your system-wide Task Manager (requests administrator permission once).
 3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`** (or choose **Revert** in `build.ps1`).
 

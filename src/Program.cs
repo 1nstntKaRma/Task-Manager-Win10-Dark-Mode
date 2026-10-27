@@ -11,8 +11,8 @@ using System.Windows.Forms;
 [assembly: AssemblyProduct("Task Manager - Dark Mode")]
 [assembly: AssemblyCompany("Task Manager Dark Mode")]
 [assembly: AssemblyCopyright("Task Manager - Dark Mode")]
-[assembly: AssemblyVersion("1.25.0.0")]
-[assembly: AssemblyFileVersion("1.25.0.0")]
+[assembly: AssemblyVersion("1.35.0.0")]
+[assembly: AssemblyFileVersion("1.35.0.0")]
 [assembly: ComVisible(false)]
 
 namespace TaskManagerDark
