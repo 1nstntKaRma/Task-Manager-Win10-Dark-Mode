@@ -13,6 +13,35 @@ Windows 10's built-in Task Manager has no dark theme. This one takes its place s
 
 ---
 
+## Screenshots
+
+*Click any image to open it full-size:*
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <b>1. CPU</b><br>
+      <img src="screenshots/performance-cpu.png" width="420" alt="Task Manager Dark Mode - CPU Performance">
+    </td>
+    <td align="center" width="50%">
+      <b>2. Memory</b><br>
+      <img src="screenshots/performance-memory.png" width="420" alt="Task Manager Dark Mode - Memory Performance">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <b>3. Disk</b><br>
+      <img src="screenshots/performance-disk.png" width="420" alt="Task Manager Dark Mode - Disk Performance">
+    </td>
+    <td align="center" width="50%">
+      <b>4. GPU</b><br>
+      <img src="screenshots/performance-gpu.png" width="420" alt="Task Manager Dark Mode - GPU Performance">
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Highlights
 
 - **Opens in ~0.3 s with live data:** CPU, memory, disks, network adapters, GPUs, and process names/icons are already populated on the very first paint—never a screen of zeros.
