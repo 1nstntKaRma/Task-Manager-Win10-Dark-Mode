@@ -11,6 +11,9 @@
 
 Windows 10's built-in Task Manager has no dark theme. This replaces it system-wide: `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar right-click menu, and `taskmgr` all open it **elevated, with no UAC prompt**, using Windows' supported `Image File Execution Options` hook—with **no system files patched or replaced**.
 
+<p align="center">
+  <picture><img src="screenshots/performance-preview.webp" width="816" alt="Task Manager Dark Mode Performance Preview"></picture>
+</p>
 <table>
   <tr>
     <td align="center" width="25%"><picture><img src="screenshots/performance-cpu.png" alt="CPU"></picture></td>
