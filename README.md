@@ -28,31 +28,39 @@ Windows 10's built-in Task Manager has no dark theme. This replaces it system-wi
 
 ## Download & Quick Start
 
-### Option 1: Download Pre-Built Release (Recommended)
+### Option 1: PowerShell One-Liner (Recommended)
 
-1. Download **`TaskManagerDark-v1.35.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
-2. Double-click **`Activate Task Manager Dark.cmd`** (or run `build.ps1` and choose **Apply Dark Mode**) to make it your system-wide Task Manager (requests administrator permission once).
-3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`** (or choose **Revert** in `build.ps1`).
-
-> **Note on Windows SmartScreen:** Pre-built binaries are not signed with a commercial certificate, so Windows may show a *"Windows protected your PC"* prompt on first run (*More info* -> *Run anyway*).
-
-### Option 2: Build from Source
-
-Paste and run in PowerShell (requires any installed **.NET SDK** for its C# compiler):
+Paste and run in PowerShell to clone into a temporary folder, build, launch the setup prompt, and automatically clean up the temporary folder when finished:
 
 ```powershell
 $d="$env:TEMP\TaskManagerDark"; Remove-Item $d -Recurse -Force -EA 0; try { git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git $d; powershell -ExecutionPolicy Bypass -File "$d\build.ps1" } finally { Remove-Item $d -Recurse -Force -EA 0 }; exit
 ```
 
-After compiling, `build.ps1` prompts:
+If no local `.NET SDK` compiler is detected on a stock Windows 10 system, `build.ps1` prompts:
 
 | Choice | Result |
 |---|---|
-| **[A] Apply Dark Mode** | `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar menu, and `taskmgr` open Task Manager Dark, elevated, with no UAC prompt. |
-| **[R] Revert** | Restores the original Windows Task Manager. |
-| **[B] Abort** | Exits without changing system integration (default). |
+| **`[1] Compile Locally`** | Downloads Microsoft's official Roslyn compiler (`~25 MB` in temp, with `winget` as fallback) and compiles from source (default). |
+| **`[2] Use Pre-built`** | Downloads the pre-built release executable directly from GitHub Releases. |
+| **`[3] Cancel`** | Exits without downloading or changing anything. |
 
-Non-interactive flags: `-Shell Apply`, `-Shell Revert`, `-Shell Abort`, or `-NoBuild -Shell Clean` (removes all changes).
+Once ready, `build.ps1` prompts (`Choice:`):
+
+| Choice | Result |
+|---|---|
+| **`[1] Apply Dark Mode`** | Any task that calls *"Task Manager"* (`Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar menu, and `taskmgr`) will now use the new Dark Mode variant, elevated, with no UAC prompt (default). |
+| **`[2] Revert`** | Restores the original Windows Task Manager. |
+| **`[3] Cancel`** | Exits without changing anything. |
+
+Non-interactive flags: `-Shell Apply`, `-Shell Revert`, `-Shell Cancel`, or `-NoBuild -Shell Clean` (removes all changes).
+
+### Option 2: Download Pre-Built Release
+
+1. Download **`TaskManagerDark-v1.35.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
+2. Double-click **`Activate Task Manager Dark.cmd`** (or run `build.ps1` and choose **`[1] Apply Dark Mode`**) to set it as your system-wide Task Manager (requests administrator permission once).
+3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`** (or choose **`[2] Revert`** in `build.ps1`).
+
+> **Note on Windows SmartScreen:** Pre-built binaries are not signed with a commercial certificate, so Windows may show a *"Windows protected your PC"* prompt on first run (*More info* -> *Run anyway*).
 
 ---
 
@@ -66,7 +74,7 @@ When you choose **Apply Dark Mode** (or run `Activate Task Manager Dark.cmd`), W
 
 Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brings an existing Task Manager Dark window to the front or triggers the `\TaskManagerDark` scheduled task—opening elevated with zero UAC prompt and forwarding switches like `/startup`. All entries are tagged so **Revert** and **Clean** only remove what this script created (and restore any prior `Debugger` such as Process Explorer).
 
-**Target OS:** Built for **Windows 10 (22H2)**. Also works on Windows 11 (though Windows 11 22H2+ includes a dark Task Manager).
+**Target OS:** Developed and tested on **Windows 10 22H2 (Build 19045)**. Also works on Windows 11 (though Windows 11 22H2+ includes a dark Task Manager).
 
 ---
 
