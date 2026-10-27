@@ -1,6 +1,6 @@
 # Task Manager (Win10) - Dark Mode
 
-> **🌑 Native dark-mode Windows 10 Task Manager — 1-click drop-in replacement ⚡**
+> **🛠️⚙️ Windows 10 - Task Manager  Dark Mode ⚡ Full replacement.**
 
 ![Version](https://img.shields.io/badge/version-v1.25-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010-0078D6)
@@ -41,7 +41,7 @@ Windows 10's built-in Task Manager has no dark theme. This replaces it system-wi
 Paste and run in PowerShell (requires any installed **.NET SDK** for its C# compiler):
 
 ```powershell
-$d="$env:TEMP\TaskManagerDark"; Remove-Item $d -Recurse -Force -EA 0; try { git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git $d; powershell -ExecutionPolicy Bypass -File "$d\build.ps1" } finally { Remove-Item $d -Recurse -Force -EA 0 }
+$d="$env:TEMP\TaskManagerDark"; Remove-Item $d -Recurse -Force -EA 0; try { git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git $d; powershell -ExecutionPolicy Bypass -File "$d\build.ps1" } finally { Remove-Item $d -Recurse -Force -EA 0 }; exit
 ```
 
 After compiling, `build.ps1` prompts:

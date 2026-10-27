@@ -66,6 +66,14 @@ function Start-ExitCountdown([int]$seconds = 3, [string]$color = 'Gray') {
     Write-Host ''
 }
 
+function Exit-Session([int]$code = 0) {
+    if (Test-Interactive) {
+        try { $Host.SetShouldExit($code) } catch {}
+        [Environment]::Exit($code)
+    }
+    exit $code
+}
+
 function Test-HasSource {
     $launcherDir = Join-Path $root 'launcher'
     if (-not (Test-Path -LiteralPath $src) -or -not (Test-Path -LiteralPath $launcherDir)) { return $false }
@@ -421,7 +429,7 @@ try {
             Write-Host ''
             Write-Host '[X] Operation aborted: No system changes were made.' -ForegroundColor Red
         }
-        exit 0
+        Exit-Session 0
     }
 
     $ok = Invoke-IntegrationElevated $Shell
@@ -429,6 +437,7 @@ try {
         $countdownColor = if ($Shell -eq 'Apply') { 'Green' } else { 'DarkYellow' }
         Start-ExitCountdown -seconds 3 -color $countdownColor
     }
+    Exit-Session 0
 }
 catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
