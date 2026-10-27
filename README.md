@@ -7,146 +7,103 @@
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8%20(built--in)-512BD4)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Task Manager – Dark Mode** is a dark, feature-for-feature recreation of the Windows 10 (22H2) Task Manager. It has every tab (**Processes**, **Performance**, **App history**, **Startup**, **Users**, **Details**, **Services**), the same menus and notification-area tray icon, and the same keyboard behavior.
+**Task Manager – Dark Mode** is a dark, feature-for-feature recreation of the Windows 10 (22H2) Task Manager. It includes all 7 tabs (**Processes**, **Performance**, **App history**, **Startup**, **Users**, **Details**, **Services**), the same menus, tray icon, and keyboard shortcuts.
 
-Windows 10's built-in Task Manager has no dark theme. This one takes its place system-wide: `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar right-click menu, and `taskmgr` all open it, **elevated, with no UAC prompt**. It uses Windows' own supported hook (`Image File Execution Options`, the same mechanism Sysinternals Process Explorer uses), with **no system files patched, replaced, or re-signed**. One click turns it on; one click reverts to the original Windows Task Manager.
+Windows 10's built-in Task Manager has no dark theme. This replaces it system-wide: `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar right-click menu, and `taskmgr` all open it **elevated, with no UAC prompt**, using Windows' supported `Image File Execution Options` hook—with **no system files patched or replaced**.
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/performance-cpu.png" width="420" alt="CPU">
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/performance-memory.png" width="420" alt="Memory">
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="screenshots/performance-disk.png" width="420" alt="Disk">
-    </td>
-    <td align="center" width="50%">
-      <img src="screenshots/performance-gpu.png" width="420" alt="GPU">
-    </td>
-  </tr>
-</table>
+<details>
+  <summary>
+    <table>
+      <tr>
+        <td align="center" width="25%"><picture><img src="screenshots/performance-cpu.png" alt="CPU"></picture></td>
+        <td align="center" width="25%"><picture><img src="screenshots/performance-memory.png" alt="Memory"></picture></td>
+        <td align="center" width="25%"><picture><img src="screenshots/performance-disk.png" alt="Disk"></picture></td>
+        <td align="center" width="25%"><picture><img src="screenshots/performance-gpu.png" alt="GPU"></picture></td>
+      </tr>
+    </table>
+    <div align="center"><sub>🔍 Click any image above to expand full-size view in this page</sub></div>
+  </summary>
+  <br>
+  <p align="center"><picture><img src="screenshots/performance-cpu.png" width="816" alt="CPU"></picture></p>
+  <p align="center"><picture><img src="screenshots/performance-memory.png" width="816" alt="Memory"></picture></p>
+  <p align="center"><picture><img src="screenshots/performance-disk.png" width="816" alt="Disk"></picture></p>
+  <p align="center"><picture><img src="screenshots/performance-gpu.png" width="816" alt="GPU"></picture></p>
+</details>
 
 ---
 
 ## Highlights
 
-- **Opens in ~0.3 s with live data:** CPU, memory, disks, network adapters, GPUs, and process names/icons are already populated on the very first paint—never a screen of zeros.
+- **Opens in ~0.3 s with live data:** CPU, memory, disks, network, GPU, and process names/icons are populated on the very first paint—never a screen of zeros.
 - **Uses ~0.1% CPU:** lightweight native GDI/WinForms rendering and background sampling.
-- **Never wakes sleeping hard disks:** disk activity is read from the disk drivers' own counters without touching spun-down drives.
-- **Single small native `.exe`:** `TaskManagerDark.exe` (~458 KB) plus a tiny fast launcher (`TaskManagerDarkLauncher.exe`, ~25 KB). Both target **.NET Framework 4.8**, which is built into every Windows 10 / 11 installation—nothing extra to install.
+- **Never wakes sleeping hard disks:** disk activity is read from the disk drivers' own counters (`IOCTL_DISK_PERFORMANCE`) without touching spun-down drives.
+- **Zero dependencies:** `TaskManagerDark.exe` (~458 KB) and `TaskManagerDarkLauncher.exe` (~26 KB) target **.NET Framework 4.8**, built into every Windows 10/11 installation.
 
 ---
 
 ## Download & Quick Start
 
-### Option 1: Download Pre-Built Release (No SDK Required)
+### Option 1: Download Pre-Built Release (Recommended)
 
-1. Download **`TaskManagerDark-v1.25.zip`** from the **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** page and extract it anywhere.
-2. Double-click **`Activate Task Manager Dark.cmd`** to make it your system-wide Task Manager (Windows will ask for administrator permission once).
-3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`**.
-4. Or simply double-click `bin\TaskManagerDark.exe` to run it standalone without installing.
+1. Download **`TaskManagerDark-v1.25.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
+2. Double-click **`Activate Task Manager Dark.cmd`** (or run `build.ps1` and choose **Apply Dark Mode**) to make it your system-wide Task Manager (requests administrator permission once).
+3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`** (or choose **Revert** in `build.ps1`).
 
-> **Note on Windows SmartScreen / Unsigned Binaries:** The pre-built `.exe` files in Releases are not signed with a commercial Authenticode certificate, so Windows SmartScreen or some antivirus tools may show an *"Windows protected your PC"* prompt on first download (*More info* -> *Run anyway*). If you prefer not to run a downloaded executable, you can compile it yourself from the C# source in ~2 seconds using Option 2 below.
+> **Note on Windows SmartScreen:** Pre-built binaries are not signed with a commercial certificate, so Windows may show a *"Windows protected your PC"* prompt on first run (*More info* -> *Run anyway*).
 
 ### Option 2: Build from Source
 
+Paste and run in PowerShell (requires any installed **.NET SDK** for its C# compiler):
+
 ```powershell
-git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git
-cd Task-Manager-Win10-Dark-Mode
-.\build.ps1
+git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git; cd Task-Manager-Win10-Dark-Mode; powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Building requires any installed **.NET SDK** (used only for its Roslyn C# compiler `csc.dll`; the compiled output targets `.NET Framework 4.8`).
-
-After building `bin\TaskManagerDark.exe` and `bin\TaskManagerDarkLauncher.exe`, `build.ps1` asks:
+After compiling, `build.ps1` prompts:
 
 | Choice | Result |
 |---|---|
-| **Yes** | `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar menu, and `taskmgr` open Task Manager Dark, elevated, with no UAC prompt. |
-| **Revert** | Restores the original Windows Task Manager. |
-| **No** | Builds only; changes nothing on the system (default). |
+| **[A] Apply Dark Mode** | `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar menu, and `taskmgr` open Task Manager Dark, elevated, with no UAC prompt. |
+| **[R] Revert** | Restores the original Windows Task Manager. |
+| **[B] Abort** | Exits without changing system integration (default). |
 
-You can also pass flags directly for non-interactive or scripted runs:
-
-- `.\build.ps1 -Shell No` — build only, without prompting (ideal for CI or automated builds).
-- `.\build.ps1 -Shell Yes` — build and activate system-wide replacement.
-- `.\build.ps1 -NoBuild -Shell Revert` — revert to the original Windows Task Manager without rebuilding.
-- `.\build.ps1 -NoBuild -Shell Clean` — remove every change the script ever made and return to factory defaults.
+Non-interactive flags: `-Shell Apply`, `-Shell Revert`, `-Shell Abort`, or `-NoBuild -Shell Clean` (removes all changes).
 
 ---
 
 ## How System-Wide Replacement & Elevation Work
 
-When you choose **Yes** (or run `Activate Task Manager Dark.cmd`), Windows asks **once** for administrator permission (only this integration step runs elevated). The script then:
+When you choose **Apply Dark Mode** (or run `Activate Task Manager Dark.cmd`), Windows asks **once** for administrator permission:
 
-1. Copies `TaskManagerDark.exe` and `TaskManagerDarkLauncher.exe` to `%ProgramFiles%\TaskManagerDark` (an administrator-only folder, ensuring no unprivileged process can tamper with or swap the binary that runs elevated).
-2. Registers the scheduled task `\TaskManagerDark` (*"Run with highest privileges"*, normal priority, scoped to your user account).
+1. Copies `TaskManagerDark.exe` and `TaskManagerDarkLauncher.exe` to `%ProgramFiles%\TaskManagerDark` (an admin-only folder so unprivileged processes cannot swap the elevated binary).
+2. Registers the scheduled task `\TaskManagerDark` (*Run with highest privileges*, scoped to your user account).
 3. Sets `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskmgr.exe` -> `Debugger = "%ProgramFiles%\TaskManagerDark\TaskManagerDarkLauncher.exe"`.
 
-When Windows launches Task Manager, it starts `TaskManagerDarkLauncher.exe` instead. The launcher brings an already-open Task Manager Dark window to the front, or triggers the `\TaskManagerDark` scheduled task (launching elevated with zero UAC prompt) and forwards command-line switches (such as `/startup` to open the Startup tab). If the scheduled task is not present, it starts `TaskManagerDark.exe` unelevated, and **File > Run as administrator** can elevate it on demand.
+Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brings an existing Task Manager Dark window to the front or triggers the `\TaskManagerDark` scheduled task—opening elevated with zero UAC prompt and forwarding switches like `/startup`. All entries are tagged so **Revert** and **Clean** only remove what this script created (and restore any prior `Debugger` such as Process Explorer).
 
-Everything created by `build.ps1` is tagged so **Revert** and **Clean** only remove their own entries. If another tool (such as Process Explorer) previously owned the `Debugger` value, `build.ps1` remembers it and restores it on **Revert**.
-
-**Target OS:** Built and tested for **Windows 10 (22H2)**. The same `Image File Execution Options` mechanism also works on Windows 11, though Windows 11 22H2 and later already include a built-in dark Task Manager.
-
----
-
-## Run Without Installing
-
-Double-click `bin\TaskManagerDark.exe`. Without administrator rights it works as a portable application, except that:
-
-- The per-process **Network** column shows `N/A` and **Disk** shows each process's total I/O (noted in the column tooltips).
-- Starting/stopping system services, managing other users' processes, and reading Startup impact require administrator rights.
+**Target OS:** Built for **Windows 10 (22H2)**. Also works on Windows 11 (though Windows 11 22H2+ includes a dark Task Manager).
 
 ---
 
 ## Features
 
-- **Fewer details / More details** views, remembered across launches.
-- **Processes**: Apps, Background processes, and Windows processes; heat-map shading and per-column totals; sorting; type-to-search; *"Service Host: ..."* rows expandable to their hosted services; apps expandable to their windows and child processes; Resource values (Memory/Disk/Network as values or percentages); optional Type, Publisher, PID, Process name, and Command line columns.
-- **Performance**: CPU (overall, logical processors, NUMA nodes, kernel times), Memory (with composition bar), every disk (SSD/HDD), every network adapter (including Wi-Fi SSID and signal strength), every GPU (engine graphs, dedicated/shared memory, driver version/date, DirectX version, physical location, temperature); graph summary view (double-click), sidebar summary view, Copy (`Ctrl+C`), and View network details.
-- **App history** from SRUM (Windows' System Resource Usage Monitor database): CPU time, Network, Metered network, Tile updates, plus Non-metered network, Downloads, and Uploads; *Delete usage history*; *Show history for all processes*.
-- **Startup**: Run keys (`HKCU`/`HKLM`, 64-bit and 32-bit `WOW6432Node`) and both Startup folders; Enable/Disable via `StartupApproved` exactly like Windows; Startup impact; Last BIOS time.
-- **Users**: Signed-in sessions with their aggregated resource usage, expandable to per-session processes; Disconnect, Sign off, Send message, Connect.
-- **Details**: Every *"Select columns"* column; End task, End process tree, Set priority, Set affinity, Analyze wait chain, UAC virtualization, Create dump file, Open file location, Search online, Properties, Go to service(s).
-- **Services**: Start, Stop, Restart, Open Services (`services.msc`), Search online, Go to details.
-- **Menus, tray icon, and keyboard shortcuts**: *Run new task* (with *"Create this task with administrative privileges"*), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Show full account name*, *Update speed* (High / Normal / Low / Paused), *Group by type*, *Expand/Collapse all*, *Status values*; live CPU usage meter in the system tray; `Ctrl+Tab` / `Ctrl+Shift+Tab`, holding `Ctrl` pauses updates, `Delete` ends selected task, `Alt` mnemonics, `F5` refresh.
-
-Settings are stored in `%APPDATA%\TaskManagerDark\settings.ini`; unexpected errors are logged to `%APPDATA%\TaskManagerDark\errors.log` and reported in a dark dialog.
-
----
-
-## Fast Startup & Disk-Sleep Architecture
-
-The window opens with real figures in ~0.2–0.3 s:
-
-- Sampling begins before the window is constructed and runs concurrently; the first sample is handed directly to the UI on first paint.
-- Nothing that can block or stall sits on the UI or update path. Disk activity comes from the disk drivers' own counters (`IOCTL_DISK_PERFORMANCE`), which **never wake a sleeping hard disk**. Performance counters (CPU frequency, GPU engines) run on a dedicated background thread. Disk models, GPU driver details, network addresses, and Wi-Fi metadata load asynchronously. Disk *"Formatted"* capacity is queried only when that specific disk's page is selected.
-- Process display names and icons load on first paint from `looks.cache` (stored alongside `settings.ini`), then revalidate in the background against each executable's file metadata.
-- The **Startup** tab enumerates its entries on a background thread so a startup binary residing on a spun-down HDD cannot freeze the window.
-- Each launch records a millisecond timeline in `%APPDATA%\TaskManagerDark\startup.log`.
+- **Processes:** Apps, Background, and Windows processes; heat-map shading, per-column totals, sorting, type-to-search, expandable *Service Host* and app window rows, resource values/percentages, and optional Type, Publisher, PID, Process name, and Command line columns. Both **Fewer details** and **More details** views are supported.
+- **Performance:** Real-time graphs and metrics for CPU (overall, logical cores, NUMA, kernel times), Memory (with composition bar), Disks (SSD/HDD without waking sleeping drives), Network adapters (with Wi-Fi SSID/signal), and GPUs (per-engine graphs, VRAM, temperature, driver/DirectX info). Supports graph summary view (double-click) and sidebar summary view.
+- **App history:** SRUM usage stats (CPU time, Network, Metered network, Tile updates, Downloads/Uploads) with *Delete usage history*.
+- **Startup:** 64/32-bit `HKCU`/`HKLM` Run keys and Startup folders, Enable/Disable (`StartupApproved`), Startup impact, and Last BIOS time—enumerated asynchronously so spun-down HDDs never stall the UI.
+- **Users:** Per-session resource usage and processes, Disconnect, Sign off, Send message, and Connect.
+- **Details:** All standard columns, End task / process tree, Set priority & affinity, Analyze wait chain, UAC virtualization, Create dump file, Open file location, Search online, dark Properties sheet, and Go to service(s).
+- **Services:** Start, Stop, Restart, Open Services (`services.msc`), Search online, and Go to details.
+- **Menus, Tray & Shortcuts:** *Run new task* (with admin option), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Update speed*, live CPU tray meter, `Ctrl+Tab`, `Delete`, `F5`, and holding `Ctrl` to pause updates. Settings and crash logs are stored in `%APPDATA%\TaskManagerDark`.
 
 ---
 
 ## Where It Differs from the Original
 
-- **Properties** opens a native dark property sheet (*General*, *Digital Signatures*, *Details*) rather than Explorer's light-themed dialog; the *Compatibility*, *Security*, and *Previous Versions* tabs are not reproduced.
-- **Power usage / Power usage trend** are estimated from each process's CPU, GPU, and disk load (Windows' internal energy estimator has no public API). The trend reflects a 2-minute rolling average.
-- **In use (Compressed)** displays the working set of the `Memory Compression` process in parentheses.
-- **Operating system context** is read from the executable's embedded manifest; **Job object ID** is left blank and **Enterprise context** displays `N/A`.
-- **GPU engine names** come from Windows' performance counters (*"3D"*, *"Copy"*, *"Video Decode"*, etc.) when the display driver does not expose custom engine names.
-- **Provide feedback** (Feedback Hub) is omitted. **File > Run as administrator** is added (shown only when running unelevated).
-- Colors are dark-adapted (performance graphs keep Task Manager's familiar hues; heat-map cells deepen from amber to orange and red).
-
----
-
-## Testing Hook
-
-`TaskManagerDark.exe --test-hook` accepts scripted commands over `WM_COPYDATA` for automated UI testing (synthetic input straight into controls and off-screen screenshots). It is completely disabled unless `--test-hook` is passed on the command line, and in that mode the physical mouse is ignored, the clipboard is untouched, and no tray icon or taskbar button is created.
+- **Properties** opens a native dark dialog (*General*, *Digital Signatures*, *Details*) instead of Explorer's light-themed property sheet.
+- **Power usage / trend** are estimated from CPU, GPU, and disk activity; **In use (Compressed)** shows the `Memory Compression` working set.
+- **Provide feedback** is omitted; **File > Run as administrator** is added when running unelevated.
+- `TaskManagerDark.exe --test-hook` enables automated testing via `WM_COPYDATA` (completely inactive unless `--test-hook` is passed).
 
 ---
 
@@ -154,4 +111,4 @@ The window opens with real figures in ~0.2–0.3 s:
 
 Licensed under the [MIT License](LICENSE).
 
-**Disclaimer:** This is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Microsoft Corporation. *"Windows"* and *"Task Manager"* are registered trademarks of Microsoft Corporation. All icons and UI rendering in this repository are generated by original code, with no Microsoft binaries or assets copied.
+**Disclaimer:** Independent open-source project, not affiliated with or endorsed by Microsoft Corporation. *"Windows"* and *"Task Manager"* are registered trademarks of Microsoft Corporation. All UI rendering and icons are generated by original code with no Microsoft assets copied.

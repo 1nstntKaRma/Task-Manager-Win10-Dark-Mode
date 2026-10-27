@@ -4,19 +4,19 @@
 # Uses the Roslyn compiler shipped with any installed .NET SDK and targets .NET Framework 4.8,
 # which is part of every Windows 10 / 11 installation (nothing extra to install for users).
 #
-#   .\build.ps1                         build, then ask about system integration
-#   .\build.ps1 -Shell Yes              build, then Ctrl+Shift+Esc etc. open Task Manager Dark
-#   .\build.ps1 -Shell Revert           build, then the original Windows Task Manager again
-#   .\build.ps1 -Shell No               build only
+#   .\build.ps1                         build (if src\ is present), then ask about system integration
+#   .\build.ps1 -Shell Apply            build, then Ctrl+Shift+Esc etc. open Task Manager Dark
+#   .\build.ps1 -Shell Revert           restore the original Windows Task Manager
+#   .\build.ps1 -Shell Abort            build only (exit without changing system integration)
 #   .\build.ps1 -NoBuild -Shell ...     only change the system integration
 #   .\build.ps1 -NoBuild -Shell Clean   remove every change this script ever made (factory state)
 #
-# "Yes" needs administrator rights once (Windows asks): it installs the two programs into
+# "Apply Dark Mode" needs administrator rights once (Windows asks): it installs the two programs into
 # %ProgramFiles%\TaskManagerDark, registers an elevated scheduled task and sets the Image File
 # Execution Options "Debugger" of taskmgr.exe to the launcher. Nothing is patched or replaced.
 param(
     [switch]$Debug,
-    [ValidateSet('Ask', 'Yes', 'Revert', 'No', 'Clean')][string]$Shell = 'Ask',
+    [ValidateSet('Ask', 'Apply', 'Apply Dark Mode', 'Yes', 'Revert', 'Abort', 'Cancel', 'No', 'Clean')][string]$Shell = 'Ask',
     [switch]$NoBuild,
     [switch]$Elevated,      # internal: set when the script relaunched itself as administrator
     [string]$UserSid,       # internal: the user the scheduled task runs for
@@ -39,17 +39,50 @@ $InstallMarker = Join-Path $InstallDir 'installed-by-build.ps1.txt'
 $IfeoPath = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskmgr.exe'
 $EtwSession = 'TaskManagerDark Kernel Trace'
 
+# Strip Mark-of-the-Web (Zone.Identifier) from extracted release files so Windows SmartScreen / ExecutionPolicy
+# never blocks the launcher or scheduled task on standard UAC-enabled PCs.
+try { Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch {}
+
+# Normalize $Shell aliases
+switch ($Shell) {
+    'Yes'             { $Shell = 'Apply' }
+    'Apply Dark Mode' { $Shell = 'Apply' }
+    'No'              { $Shell = 'Abort' }
+    'Cancel'          { $Shell = 'Abort' }
+}
+
 function Say([string]$text, [string]$color = '') {
     if ($color) { Write-Host $text -ForegroundColor $color } else { Write-Host $text }
     if ($LogFile) { Add-Content -Path $LogFile -Value $text -Encoding UTF8 }
 }
 
+function Test-HasSource {
+    $launcherDir = Join-Path $root 'launcher'
+    if (-not (Test-Path -LiteralPath $src) -or -not (Test-Path -LiteralPath $launcherDir)) { return $false }
+    $csCount = @(Get-ChildItem -LiteralPath $src -Filter *.cs -Recurse -ErrorAction SilentlyContinue).Count
+    return ($csCount -gt 0)
+}
+
 # ======================================================================================= build
 function Invoke-Build {
+    if (-not (Test-HasSource)) {
+        if ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $launcherExe)) {
+            Write-Host "Using pre-built binaries in $bin" -ForegroundColor Green
+            return
+        }
+        throw "No source files found in '$src' and pre-built binaries were not found in '$bin'. Make sure you extracted the entire zip archive before running build.ps1."
+    }
+
     New-Item -ItemType Directory -Force $bin, $obj | Out-Null
     $csc = Get-ChildItem "$env:ProgramFiles\dotnet\sdk\*\Roslyn\bincore\csc.dll" -ErrorAction SilentlyContinue |
         Sort-Object { [version]($_.FullName -replace '.*\\sdk\\([\d\.]+)[^\\]*\\.*', '$1') } -Descending | Select-Object -First 1
-    if (-not $csc) { throw 'No .NET SDK found (needed only to build).' }
+    if (-not $csc) {
+        if ((Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $launcherExe)) {
+            Write-Host "No .NET SDK found; using existing pre-built binaries in $bin" -ForegroundColor Yellow
+            return
+        }
+        throw 'No .NET SDK found (needed only to build from source; download the pre-built Release zip if you do not have the .NET SDK installed).'
+    }
 
     $fw = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
     if (-not (Test-Path $fw)) { $fw = "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319" }
@@ -91,7 +124,7 @@ function Invoke-Build {
     Write-Host "Built $exe ($size KB) and $(Split-Path $launcherExe -Leaf) ($lsize KB) with $($csc.Directory.Parent.Parent.Name)" -ForegroundColor Green
     if ((Test-Path $InstallMarker) -and (Test-Path $InstalledExe)) {
         $same = (Get-FileHash $exe).Hash -eq (Get-FileHash $InstalledExe).Hash
-        if (-not $same) { Write-Host "  The installed copy in $InstallDir is older. Choose Yes (or -Shell Yes) to update it." -ForegroundColor Yellow }
+        if (-not $same) { Write-Host "  The installed copy in $InstallDir is older. Choose Apply Dark Mode (or -Shell Apply) to update it." -ForegroundColor Yellow }
     }
 }
 
@@ -119,7 +152,7 @@ function Get-RegistryViews {
 function Show-Windows11Note {
     $build = Get-OsBuild
     if ($build -ge 22000) {
-        Say "  Windows 11 detected (build $build). Image File Execution Options still applies, so Yes works here too." 'Yellow'
+        Say "  Windows 11 detected (build $build). Image File Execution Options still applies, so Apply Dark Mode works here too." 'Yellow'
         if ($build -ge 22621) { Say '  Note: Windows 11 22H2 and later already include a dark Task Manager.' 'Yellow' }
     }
 }
@@ -131,7 +164,9 @@ function Install-Files {
     if ($running) { throw "Task Manager Dark is running from $InstallDir. Close it (File > Exit) and try again." }
     if ((Test-Path $InstallDir) -and -not (Test-Path $InstallMarker)) { throw "$InstallDir exists but was not created by this script; it was left alone." }
     New-Item -ItemType Directory -Force $InstallDir | Out-Null
+    try { Unblock-File -LiteralPath $exe, $launcherExe -ErrorAction SilentlyContinue } catch {}
     Copy-Item -LiteralPath $exe, $launcherExe -Destination $InstallDir -Force
+    try { Unblock-File -LiteralPath $InstalledExe, $InstalledLauncher -ErrorAction SilentlyContinue } catch {}
     Set-Content -Path $InstallMarker -Encoding ASCII -Value @(
         "Installed by $PSCommandPath ($Marker) on $(Get-Date -Format s).",
         'Remove with: build.ps1 -NoBuild -Shell Revert (or -Shell Clean).')
@@ -267,7 +302,7 @@ function Stop-EtwSession {
 
 function Invoke-Integration([string]$mode) {
     switch ($mode) {
-        'Yes' {
+        'Apply' {
             Say 'System integration -> Task Manager Dark' 'Cyan'
             Show-Windows11Note
             $sid = if ($UserSid) { $UserSid } else { [Security.Principal.WindowsIdentity]::GetCurrent().User.Value }
@@ -335,30 +370,34 @@ if ($Elevated) {
 $ownConsole = Test-OwnConsole
 $asked = $false
 try {
-    if (-not $NoBuild) { Invoke-Build }
+    if (-not $NoBuild) {
+        if ((Test-HasSource) -or $Shell -ne 'Revert') {
+            Invoke-Build
+        }
+    }
 
     if ($Shell -eq 'Ask') {
         if (Test-Interactive) {
             Show-Windows11Note
             $choices = [System.Management.Automation.Host.ChoiceDescription[]]@(
-                (New-Object System.Management.Automation.Host.ChoiceDescription '&Yes', 'Ctrl+Shift+Esc and every "Task Manager" entry point open Task Manager Dark (asks for administrator permission once).'),
-                (New-Object System.Management.Automation.Host.ChoiceDescription '&Revert', 'The original Windows Task Manager again (removes only what this script added).'),
-                (New-Object System.Management.Automation.Host.ChoiceDescription '&No', 'Change nothing.'))
-            $msg = "`n  Yes    - Ctrl+Shift+Esc, Ctrl+Alt+Del and the taskbar open Task Manager Dark (elevated, no prompt)`n" +
-                   "  Revert - the original Windows Task Manager again`n" +
-                   "  No     - change nothing`n"
+                (New-Object System.Management.Automation.Host.ChoiceDescription '&Apply Dark Mode', 'Ctrl+Shift+Esc and every "Task Manager" entry point open Task Manager Dark (asks for administrator permission once).'),
+                (New-Object System.Management.Automation.Host.ChoiceDescription '&Revert', 'Restore the original Windows Task Manager (removes only what this script added).'),
+                (New-Object System.Management.Automation.Host.ChoiceDescription 'A&bort', 'Exit without changing anything.'))
+            $msg = "`n  Apply Dark Mode - Ctrl+Shift+Esc, Ctrl+Alt+Del and the taskbar open Task Manager Dark (elevated, no prompt)`n" +
+                   "  Revert          - Restore the original Windows Task Manager`n" +
+                   "  Abort           - Exit without changing anything`n"
             $pick = $Host.UI.PromptForChoice('Task Manager', $msg, $choices, 2)
             $asked = $true
-            $Shell = @('Yes', 'Revert', 'No')[$pick]
+            $Shell = @('Apply', 'Revert', 'Abort')[$pick]
         }
-        else { $Shell = 'No' }
+        else { $Shell = 'Abort' }
     }
 
-    if ($Shell -ne 'No') { Invoke-IntegrationElevated $Shell }
+    if ($Shell -ne 'Abort') { Invoke-IntegrationElevated $Shell }
 }
 catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
-    if ($ownConsole -and (Test-Interactive) -and $Shell -eq 'Ask') { Read-Host 'Press Enter to close' | Out-Null }
+    if (Test-Interactive) { Read-Host "`nPress Enter to close" | Out-Null }
     exit 1
 }
 if ($ownConsole -and $asked) { Read-Host "`nDone. Press Enter to close" | Out-Null }
