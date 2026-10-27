@@ -11,31 +11,21 @@
 
 Windows 10's built-in Task Manager has no dark theme. This one takes its place system-wide: `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar right-click menu, and `taskmgr` all open it, **elevated, with no UAC prompt**. It uses Windows' own supported hook (`Image File Execution Options`, the same mechanism Sysinternals Process Explorer uses), with **no system files patched, replaced, or re-signed**. One click turns it on; one click reverts to the original Windows Task Manager.
 
----
-
-## Screenshots
-
-*Click any image to open it full-size:*
-
 <table>
   <tr>
     <td align="center" width="50%">
-      <b>1. CPU</b><br>
-      <img src="screenshots/performance-cpu.png" width="420" alt="Task Manager Dark Mode - CPU Performance">
+      <img src="screenshots/performance-cpu.png" width="420" alt="CPU">
     </td>
     <td align="center" width="50%">
-      <b>2. Memory</b><br>
-      <img src="screenshots/performance-memory.png" width="420" alt="Task Manager Dark Mode - Memory Performance">
+      <img src="screenshots/performance-memory.png" width="420" alt="Memory">
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <b>3. Disk</b><br>
-      <img src="screenshots/performance-disk.png" width="420" alt="Task Manager Dark Mode - Disk Performance">
+      <img src="screenshots/performance-disk.png" width="420" alt="Disk">
     </td>
     <td align="center" width="50%">
-      <b>4. GPU</b><br>
-      <img src="screenshots/performance-gpu.png" width="420" alt="Task Manager Dark Mode - GPU Performance">
+      <img src="screenshots/performance-gpu.png" width="420" alt="GPU">
     </td>
   </tr>
 </table>
