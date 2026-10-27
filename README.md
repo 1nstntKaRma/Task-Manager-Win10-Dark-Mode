@@ -11,23 +11,14 @@
 
 Windows 10's built-in Task Manager has no dark theme. This replaces it system-wide: `Ctrl+Shift+Esc`, `Ctrl+Alt+Del` -> *Task Manager*, the taskbar right-click menu, and `taskmgr` all open it **elevated, with no UAC prompt**, using Windows' supported `Image File Execution Options` hook—with **no system files patched or replaced**.
 
-<details name="gallery">
-  <summary><picture><img align="left" src="screenshots/performance-cpu.png" width="185" alt="CPU"></picture></summary>
-  <p align="center"><picture><img src="screenshots/performance-cpu.png" width="816" alt="CPU"></picture></p>
-</details>
-<details name="gallery">
-  <summary><picture><img align="left" src="screenshots/performance-memory.png" width="185" alt="Memory"></picture></summary>
-  <p align="center"><picture><img src="screenshots/performance-memory.png" width="816" alt="Memory"></picture></p>
-</details>
-<details name="gallery">
-  <summary><picture><img align="left" src="screenshots/performance-disk.png" width="185" alt="Disk"></picture></summary>
-  <p align="center"><picture><img src="screenshots/performance-disk.png" width="816" alt="Disk"></picture></p>
-</details>
-<details name="gallery">
-  <summary><picture><img align="left" src="screenshots/performance-gpu.png" width="185" alt="GPU"></picture></summary>
-  <p align="center"><picture><img src="screenshots/performance-gpu.png" width="816" alt="GPU"></picture></p>
-</details>
-<br clear="all">
+<table>
+  <tr>
+    <td align="center" width="25%"><picture><img src="screenshots/performance-cpu.png" alt="CPU"></picture></td>
+    <td align="center" width="25%"><picture><img src="screenshots/performance-memory.png" alt="Memory"></picture></td>
+    <td align="center" width="25%"><picture><img src="screenshots/performance-disk.png" alt="Disk"></picture></td>
+    <td align="center" width="25%"><picture><img src="screenshots/performance-gpu.png" alt="GPU"></picture></td>
+  </tr>
+</table>
 
 ---
 
