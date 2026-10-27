@@ -492,7 +492,7 @@ function Invoke-IntegrationElevated([string]$mode) {
 }
 
 function Test-Interactive {
-    try { return [Environment]::UserInteractive -and -not [Console]::IsInputRedirected -and $Host.Name -eq 'ConsoleHost' } catch { return $false }
+    try { return [Environment]::UserInteractive -and ($Host.Name -in @('ConsoleHost', 'Windows PowerShell ISE Host')) -and ([Environment]::GetCommandLineArgs() -notcontains '-NonInteractive') } catch { return $false }
 }
 
 # ======================================================================================= main

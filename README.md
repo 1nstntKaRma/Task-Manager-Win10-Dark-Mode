@@ -30,10 +30,10 @@ Windows 10's built-in Task Manager has no dark theme. This replaces it system-wi
 
 ### Option 1: PowerShell One-Liner (Recommended)
 
-Paste and run in PowerShell to clone into a temporary folder, build, launch the setup prompt, and automatically clean up the temporary folder when finished:
+Paste and run in PowerShell (works on any stock Windows 10/11 PC — no `git` required) to download into a temporary folder, build, launch the setup prompt, and automatically clean up the temporary folder when finished:
 
 ```powershell
-$d="$env:TEMP\TaskManagerDark"; Remove-Item $d -Recurse -Force -EA 0; try { git clone https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode.git $d; powershell -ExecutionPolicy Bypass -File "$d\build.ps1" } finally { Remove-Item $d -Recurse -Force -EA 0 }; exit
+$d="$env:TEMP\TaskManagerDark"; $z="$d.zip"; Remove-Item $d,$z -Recurse -Force -EA 0; try { [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/archive/refs/heads/main.zip -OutFile $z -UseBasicParsing; Expand-Archive $z $d -Force; powershell -ExecutionPolicy Bypass -File "$d\Task-Manager-Win10-Dark-Mode-main\build.ps1" } finally { Remove-Item $d,$z -Recurse -Force -EA 0 }
 ```
 
 If no local `.NET SDK` compiler is detected on a stock Windows 10 system, `build.ps1` prompts:
