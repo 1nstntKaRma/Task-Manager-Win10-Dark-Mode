@@ -14,14 +14,6 @@ Windows 10's built-in Task Manager has no dark theme. This replaces it system-wi
 <p align="center">
   <picture><img src="screenshots/performance-preview.webp" width="816" alt="Task Manager Dark Mode Performance Preview"></picture>
 </p>
-<table>
-  <tr>
-    <td align="center" width="25%"><picture><img src="screenshots/performance-cpu.png" alt="CPU"></picture></td>
-    <td align="center" width="25%"><picture><img src="screenshots/performance-memory.png" alt="Memory"></picture></td>
-    <td align="center" width="25%"><picture><img src="screenshots/performance-disk.png" alt="Disk"></picture></td>
-    <td align="center" width="25%"><picture><img src="screenshots/performance-gpu.png" alt="GPU"></picture></td>
-  </tr>
-</table>
 
 ---
 
