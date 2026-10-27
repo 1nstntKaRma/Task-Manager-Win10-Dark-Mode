@@ -1,6 +1,6 @@
 # Task Manager (Win10) - Dark Mode
 
-> **The Windows 10 Task Manager, in dark mode: same features, a drop-in replacement, one-click install and revert.**
+> **🌑 Native dark-mode Windows 10 Task Manager — 1-click drop-in replacement ⚡**
 
 ![Version](https://img.shields.io/badge/version-v1.25-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010-0078D6)

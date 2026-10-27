@@ -53,7 +53,17 @@ switch ($Shell) {
 
 function Say([string]$text, [string]$color = '') {
     if ($color) { Write-Host $text -ForegroundColor $color } else { Write-Host $text }
-    if ($LogFile) { Add-Content -Path $LogFile -Value $text -Encoding UTF8 }
+    if ($LogFile) { Add-Content -Path $LogFile -Value "$color|$text" -Encoding UTF8 }
+}
+
+function Start-ExitCountdown([int]$seconds = 3, [string]$color = 'Gray') {
+    if (-not (Test-Interactive)) { return }
+    for ($i = $seconds; $i -ge 1; $i--) {
+        $s = if ($i -eq 1) { '' } else { 's' }
+        Write-Host "`rClosing in $i second$s...   " -ForegroundColor $color -NoNewline
+        Start-Sleep -Seconds 1
+    }
+    Write-Host ''
 }
 
 function Test-HasSource {
@@ -309,14 +319,16 @@ function Invoke-Integration([string]$mode) {
             Install-Files
             Install-Task $sid
             Set-Ifeo
-            Say '  Done: Ctrl+Shift+Esc, Ctrl+Alt+Del > Task Manager, the taskbar menu and "taskmgr" now open Task Manager Dark (elevated, no prompt).' 'Green'
+            Say ''
+            Say '[OK] Operation completed successfully: Task Manager Dark Mode is now active (Ctrl+Shift+Esc, Ctrl+Alt+Del, taskbar, and "taskmgr").' 'Green'
         }
         'Revert' {
             Say 'System integration -> the original Windows Task Manager' 'Cyan'
             Remove-Ifeo
             Remove-Task
             Remove-Files
-            Say '  Done: Windows Task Manager is back.' 'Green'
+            Say ''
+            Say '[!] Operation completed successfully: Reverted to the original Windows Task Manager.' 'DarkYellow'
         }
         'Clean' {
             Say 'System integration -> removing every change made by this script' 'Cyan'
@@ -324,14 +336,15 @@ function Invoke-Integration([string]$mode) {
             Remove-Task
             Remove-Files
             Stop-EtwSession
-            Say '  Done: the system is back to the Windows defaults.' 'Green'
+            Say ''
+            Say '[!] Operation completed successfully: System restored to Windows defaults.' 'DarkYellow'
         }
     }
 }
 
 # Image File Execution Options and scheduled tasks are machine settings: only that step runs as administrator.
 function Invoke-IntegrationElevated([string]$mode) {
-    if (Test-Admin) { Invoke-Integration $mode; return }
+    if (Test-Admin) { Invoke-Integration $mode; return $true }
     Write-Host ''
     Write-Host 'This step changes machine-wide settings (Image File Execution Options for taskmgr.exe, an elevated' -ForegroundColor Cyan
     Write-Host 'scheduled task and %ProgramFiles%\TaskManagerDark), so Windows will ask once for administrator permission.' -ForegroundColor Cyan
@@ -339,25 +352,30 @@ function Invoke-IntegrationElevated([string]$mode) {
     $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -NoBuild -Shell $mode -Elevated -UserSid $sid -LogFile `"$log`""
     try { $p = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs -WindowStyle Hidden -Wait -PassThru }
-    catch { Write-Host 'Administrator permission was not given, so nothing was changed.' -ForegroundColor Yellow; return }
-    if (Test-Path $log) { Get-Content $log -Encoding UTF8 | ForEach-Object { Write-Host $_ }; Remove-Item $log -Force }
+    catch {
+        Write-Host ''
+        Write-Host '[X] Operation aborted: Administrator permission was not granted; no changes were made.' -ForegroundColor Red
+        return $false
+    }
+    if (Test-Path $log) {
+        Get-Content $log -Encoding UTF8 | ForEach-Object {
+            $idx = $_.IndexOf('|')
+            if ($idx -ge 0) {
+                $c = $_.Substring(0, $idx)
+                $t = $_.Substring($idx + 1)
+                if ($c) { Write-Host $t -ForegroundColor $c } else { Write-Host $t }
+            } else {
+                Write-Host $_
+            }
+        }
+        Remove-Item $log -Force
+    }
     if ($p.ExitCode -ne 0) { throw "The administrator step failed (exit code $($p.ExitCode))." }
+    return $true
 }
 
 function Test-Interactive {
     try { return [Environment]::UserInteractive -and -not [Console]::IsInputRedirected -and $Host.Name -eq 'ConsoleHost' } catch { return $false }
-}
-
-function Test-OwnConsole {
-    # true when this script got its own console window (e.g. "Run with PowerShell"), so we pause before it closes
-    try {
-        if (-not ('TaskManagerDarkBuild.Console' -as [type])) {
-            Add-Type -Namespace 'TaskManagerDarkBuild' -Name 'Console' -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint GetConsoleProcessList(uint[] list, uint count);'
-        }
-        $list = New-Object 'uint[]' 8
-        return [TaskManagerDarkBuild.Console]::GetConsoleProcessList($list, 8) -le 1
-    }
-    catch { return $false }
 }
 
 # ======================================================================================= main
@@ -367,7 +385,6 @@ if ($Elevated) {
     catch { Say "ERROR: $($_.Exception.Message)" 'Red'; exit 1 }
 }
 
-$ownConsole = Test-OwnConsole
 $asked = $false
 try {
     if (-not $NoBuild) {
@@ -393,11 +410,22 @@ try {
         else { $Shell = 'Abort' }
     }
 
-    if ($Shell -ne 'Abort') { Invoke-IntegrationElevated $Shell }
+    if ($Shell -eq 'Abort') {
+        if ($asked -or $NoBuild) {
+            Write-Host ''
+            Write-Host '[X] Operation aborted: No system changes were made.' -ForegroundColor Red
+        }
+        exit 0
+    }
+
+    $ok = Invoke-IntegrationElevated $Shell
+    if ($ok) {
+        $countdownColor = if ($Shell -eq 'Apply') { 'Green' } else { 'DarkYellow' }
+        Start-ExitCountdown -seconds 3 -color $countdownColor
+    }
 }
 catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     if (Test-Interactive) { Read-Host "`nPress Enter to close" | Out-Null }
     exit 1
 }
-if ($ownConsole -and $asked) { Read-Host "`nDone. Press Enter to close" | Out-Null }
