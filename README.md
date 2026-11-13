@@ -72,7 +72,7 @@ When you choose **Apply Dark Mode** (or run `Activate Task Manager Dark.cmd`), W
 2. Registers the scheduled task `\TaskManagerDark` (*Run with highest privileges*, scoped to your user account).
 3. Sets `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskmgr.exe` -> `Debugger = "%ProgramFiles%\TaskManagerDark\TaskManagerDarkLauncher.exe"`.
 
-Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brings an existing Task Manager Dark window to the front or triggers the `\TaskManagerDark` scheduled task—opening elevated with zero UAC prompt and forwarding switches like `/startup`. All entries are tagged so **Revert** and **Clean** only remove what this script created (and restore any prior `Debugger` such as Process Explorer).
+Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brings an existing Task Manager Dark window to the front or triggers the `\TaskManagerDark` scheduled task—opening elevated with zero UAC prompt and forwarding switches like `/startup`. The elevated copy honors only Task Manager's own switches (`/startup` and the tab to open), so no other program can use the scheduled task to start it with testing or debugging options. All entries are tagged so **Revert** and **Clean** only remove what this script created (and restore any prior `Debugger` such as Process Explorer).
 
 **Target OS:** Developed and tested on **Windows 10 22H2 (Build 19045)**. Also works on Windows 11 (though Windows 11 22H2+ includes a dark Task Manager).
 

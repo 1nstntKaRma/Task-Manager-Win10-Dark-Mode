@@ -355,7 +355,7 @@ function Install-Task([string]$sid) {
   <Actions Context="Author">
     <Exec>
       <Command>"$(& $esc $InstalledExe)"</Command>
-      <Arguments>`$(Arg0)</Arguments>
+      <Arguments>--from-task `$(Arg0)</Arguments>
       <WorkingDirectory>$(& $esc $InstallDir)</WorkingDirectory>
     </Exec>
   </Actions>
