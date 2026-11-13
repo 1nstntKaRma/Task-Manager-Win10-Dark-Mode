@@ -1,0 +1,109 @@
+# Publishes a release when a version tag is pushed (git tag v1.36 && git push origin v1.36):
+# builds on GitHub's servers, signs the programs through SignPath when that is set up, packages
+# TaskManagerDark-v<VERSION>.zip with SHA256SUMS.txt, records build provenance (gh attestation verify)
+# and creates the GitHub release. The tag must match the VERSION file.
+#
+# Code signing switches itself on once these exist (Settings > Secrets and variables > Actions):
+#   secret   SIGNPATH_API_TOKEN
+#   variable SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG
+# Without them the release is published unsigned, as before.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write       # create the release
+  actions: read         # SignPath fetches the unsigned artifact
+  id-token: write       # build provenance attestation
+  attestations: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag must match VERSION
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -TotalCount 1).Trim()
+          if ("v$v" -ne '${{ github.ref_name }}') { throw "Tag ${{ github.ref_name }} does not match VERSION ($v)." }
+          "VERSION=$v" >> $env:GITHUB_ENV
+
+      - name: Build
+        shell: powershell
+        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\build.ps1 -Shell Cancel
+
+      - name: Upload the unsigned programs for signing
+        if: env.SIGN == 'true'
+        id: unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned
+          path: |
+            bin/TaskManagerDark.exe
+            bin/TaskManagerDarkLauncher.exe
+
+      - name: Sign with SignPath (waits for the release to be approved in SignPath)
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: bin
+
+      - name: Check the signatures
+        if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          foreach ($f in 'bin\TaskManagerDark.exe', 'bin\TaskManagerDarkLauncher.exe') {
+            $s = Get-AuthenticodeSignature $f
+            if ($s.Status -ne 'Valid') { throw "$f is not validly signed ($($s.Status))." }
+            "$f signed by $($s.SignerCertificate.Subject)"
+          }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'package'
+          New-Item -ItemType Directory -Force (Join-Path $stage 'bin') | Out-Null
+          Copy-Item bin\TaskManagerDark.exe, bin\TaskManagerDarkLauncher.exe (Join-Path $stage 'bin')
+          Copy-Item build.ps1, VERSION, README.md, LICENSE, 'Activate Task Manager Dark.cmd', 'Revert to Windows Task Manager.cmd' $stage
+          $zip = "TaskManagerDark-v$env:VERSION.zip"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::CreateFromDirectory($stage, (Join-Path $PWD $zip))
+          Copy-Item bin\TaskManagerDark.exe, bin\TaskManagerDarkLauncher.exe .
+          $files = $zip, 'TaskManagerDark.exe', 'TaskManagerDarkLauncher.exe'
+          $files | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant())  $_" } | Set-Content SHA256SUMS.txt -Encoding ascii
+          Get-Content SHA256SUMS.txt
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            TaskManagerDark-v*.zip
+            TaskManagerDark.exe
+            TaskManagerDarkLauncher.exe
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = Join-Path $env:RUNNER_TEMP 'notes.md'
+          if (Test-Path .github\RELEASE_NOTES.md) { Get-Content .github\RELEASE_NOTES.md -Raw | Set-Content $notes } else { '' | Set-Content $notes }
+          $rows = Get-Content SHA256SUMS.txt | ForEach-Object { $h, $n = $_ -split '\s+', 2; "| $n | ``$h`` |" }
+          $tail = @('', '### SHA-256 Checksums', '| File | SHA-256 |', '|---|---|') + $rows + @(
+            '', 'Built on GitHub Actions from this tag. Verify with:',
+            '```', "gh attestation verify TaskManagerDark-v$env:VERSION.zip --repo ${{ github.repository }}", '```')
+          Add-Content $notes $tail
+          gh release create '${{ github.ref_name }}' "TaskManagerDark-v$env:VERSION.zip" SHA256SUMS.txt TaskManagerDark.exe `
+            --title "Task Manager - Dark Mode v$env:VERSION" --notes-file $notes --verify-tag
