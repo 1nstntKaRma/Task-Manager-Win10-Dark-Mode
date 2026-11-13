@@ -44,11 +44,20 @@ $EtwSession = 'TaskManagerDark Kernel Trace'
 # never blocks the launcher or scheduled task on standard UAC-enabled PCs.
 try { Get-ChildItem -LiteralPath $root -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch {}
 
-# Normalize $Shell aliases
-$ReleaseZipUrl = 'https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest/download/TaskManagerDark-v1.35.zip'
+# The one version number of the project: VERSION is stamped into both programs and picks the matching release
+# for the pre-built download (so an older copy of this script never asks for a newer release's file name).
+$VersionFile = Join-Path $root 'VERSION'
+$Version = if (Test-Path -LiteralPath $VersionFile) { (Get-Content -LiteralPath $VersionFile -TotalCount 1).Trim() } else { $null }
+$ReleaseBaseUrl = "https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/download/v$Version"
+$ReleaseZipName = "TaskManagerDark-v$Version.zip"
+
+# Every download is checked before it is used: the compiler against the hash NuGet publishes for it, the pre-built
+# release against the SHA256SUMS.txt published with that release.
 $RoslynNugetUrl = 'https://www.nuget.org/api/v2/package/Microsoft.Net.Compilers.Toolset/4.11.0'
+$RoslynSha256 = 'DB165C75F0D0386D078D01448F96C93F8222320633E4FE828F5D1BF8C99B7D6F'
 $TempRoslynDir = Join-Path $env:TEMP 'RoslynCompiler-4.11.0'
 
+# Normalize $Shell aliases
 switch ($Shell) {
     '1'               { $Shell = 'Apply' }
     'Yes'             { $Shell = 'Apply' }
@@ -120,6 +129,30 @@ function Exit-Session([int]$code = 0) {
     exit $code
 }
 
+function Get-VersionStamp {
+    if (-not $Version) { throw "The VERSION file was not found next to build.ps1 ($VersionFile)." }
+    if ($Version -notmatch '^\d+\.\d+(\.\d+)?$') { throw "VERSION must look like 1.36 or 1.36.1 (found '$Version')." }
+    $v = [version]$Version
+    return "$($v.Major).$($v.Minor).$([Math]::Max(0, $v.Build)).0"
+}
+
+# Deletes the file and stops when it is not byte-for-byte what was published.
+function Assert-FileHash([string]$path, [string]$expected, [string]$what) {
+    $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    if ($actual -ne $expected.ToUpperInvariant()) {
+        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        throw "$what failed verification and was deleted (SHA-256 $actual, expected $($expected.ToUpperInvariant())). Nothing was installed."
+    }
+}
+
+# The hash listed for $name in a sha256sum-style file ("<hash>  <name>").
+function Get-ListedHash([string]$sumsFile, [string]$name) {
+    foreach ($line in Get-Content -LiteralPath $sumsFile) {
+        if ($line -match '^\s*([0-9a-fA-F]{64})\s+\*?(.+?)\s*$' -and $Matches[2] -eq $name) { return $Matches[1] }
+    }
+    throw "SHA256SUMS.txt of release v$Version does not list $name, so the download cannot be verified. Nothing was installed."
+}
+
 function Test-HasSource {
     $launcherDir = Join-Path $root 'launcher'
     if (-not (Test-Path -LiteralPath $src) -or -not (Test-Path -LiteralPath $launcherDir)) { return $false }
@@ -130,7 +163,9 @@ function Test-HasSource {
 function Show-BuildSummary {
     $size = [math]::Round((Get-Item -LiteralPath $exe).Length / 1KB)
     $lsize = [math]::Round((Get-Item -LiteralPath $launcherExe).Length / 1KB)
-    Write-Host 'Task Manager - Dark Mode Build path:' -ForegroundColor Green
+    $ver = ''
+    try { $fv = [version](Get-Item -LiteralPath $exe).VersionInfo.FileVersion; $ver = " v$($fv.Major).$($fv.Minor)" + $(if ($fv.Build -gt 0) { ".$($fv.Build)" } else { '' }) } catch {}
+    Write-Host "Task Manager - Dark Mode$ver Build path:" -ForegroundColor Green
     Write-Host "`"$bin`"" -ForegroundColor Green
     Write-Host "$(Split-Path $exe -Leaf) ($size KB) & $(Split-Path $launcherExe -Leaf) ($lsize KB)" -ForegroundColor Green
     if ((Test-Path $InstallMarker) -and (Test-Path $InstalledExe)) {
@@ -177,18 +212,23 @@ function Invoke-Build {
             Exit-Session 0
         }
         elseif ($cPick -eq 1) {
-            Write-Host 'Downloading pre-built release binaries from GitHub Releases...' -ForegroundColor Cyan
+            [void](Get-VersionStamp)
+            Write-Host "Downloading pre-built release v$Version from GitHub Releases..." -ForegroundColor Cyan
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             $z = Join-Path $env:TEMP ('TaskManagerDark-rel-' + [guid]::NewGuid().ToString('N') + '.zip')
+            $sums = Join-Path $env:TEMP ('TaskManagerDark-sums-' + [guid]::NewGuid().ToString('N') + '.txt')
             $x = Join-Path $env:TEMP ('TaskManagerDark-ext-' + [guid]::NewGuid().ToString('N'))
             try {
-                Invoke-WebRequest -Uri $ReleaseZipUrl -OutFile $z -UseBasicParsing
+                Invoke-WebRequest -Uri "$ReleaseBaseUrl/$ReleaseZipName" -OutFile $z -UseBasicParsing
+                Invoke-WebRequest -Uri "$ReleaseBaseUrl/SHA256SUMS.txt" -OutFile $sums -UseBasicParsing
+                Assert-FileHash $z (Get-ListedHash $sums $ReleaseZipName) "The download $ReleaseZipName"
+                Write-Host "  Verified $ReleaseZipName against the release's SHA256SUMS.txt." -ForegroundColor Green
                 Expand-Archive -LiteralPath $z -DestinationPath $x -Force
                 Copy-Item -LiteralPath (Join-Path $x 'bin\TaskManagerDark.exe') -Destination $exe -Force
                 Copy-Item -LiteralPath (Join-Path $x 'bin\TaskManagerDarkLauncher.exe') -Destination $launcherExe -Force
                 try { Unblock-File -LiteralPath $exe, $launcherExe -ErrorAction SilentlyContinue } catch {}
             } finally {
-                Remove-Item -LiteralPath $z -Force -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $z, $sums -Force -ErrorAction SilentlyContinue
                 Remove-Item -LiteralPath $x -Recurse -Force -ErrorAction SilentlyContinue
             }
             Show-BuildSummary
@@ -200,6 +240,7 @@ function Invoke-Build {
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
                 $z = Join-Path $env:TEMP ('roslyn-' + [guid]::NewGuid().ToString('N') + '.zip')
                 Invoke-WebRequest -Uri $RoslynNugetUrl -OutFile $z -UseBasicParsing
+                Assert-FileHash $z $RoslynSha256 'The Roslyn compiler package'
                 if (Test-Path -LiteralPath $TempRoslynDir) { Remove-Item -LiteralPath $TempRoslynDir -Recurse -Force -ErrorAction SilentlyContinue }
                 Expand-Archive -LiteralPath $z -DestinationPath $TempRoslynDir -Force
                 Remove-Item -LiteralPath $z -Force -ErrorAction SilentlyContinue
@@ -224,7 +265,14 @@ function Invoke-Build {
     if (-not (Test-Path $fw)) { $fw = "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319" }
     $refs = @('mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Xml.dll', 'System.Management.dll', 'System.Configuration.dll') |
         ForEach-Object { "-r:$fw\$_" }
-    $files = Get-ChildItem $src -Filter *.cs -Recurse | ForEach-Object { $_.FullName }
+    # both programs carry the version from VERSION
+    $stamp = Get-VersionStamp
+    $versionCs = Join-Path $obj 'VersionInfo.cs'
+    Set-Content -LiteralPath $versionCs -Encoding ASCII -Value @(
+        '// Generated by build.ps1 from VERSION. Do not edit.',
+        "[assembly: System.Reflection.AssemblyVersion(`"$stamp`")]",
+        "[assembly: System.Reflection.AssemblyFileVersion(`"$stamp`")]")
+    $files = @(Get-ChildItem $src -Filter *.cs -Recurse | ForEach-Object { $_.FullName }) + $versionCs
     $common = @('-nologo', '-noconfig', '-nostdlib', '-target:winexe', '-platform:anycpu', '-unsafe', '-langversion:latest',
                 '-deterministic', '-nowarn:CS0169,CS0414,CS0649,CS0168,CS0219,CS1998,CS0108,CS1690')
     if ($Debug) { $common += @('-debug:portable', '-optimize-', '-define:DEBUG') } else { $common += @('-optimize+', '-debug-') }
@@ -252,7 +300,7 @@ function Invoke-Build {
         Compile $exe "$src\app.manifest" $files $refs @("-win32icon:$ico")
 
         # the tiny launcher that Windows starts instead of taskmgr.exe (no WinForms, so it starts fast)
-        $launcherSrc = Get-ChildItem (Join-Path $root 'launcher') -Filter *.cs | ForEach-Object { $_.FullName }
+        $launcherSrc = @(Get-ChildItem (Join-Path $root 'launcher') -Filter *.cs | ForEach-Object { $_.FullName }) + $versionCs
         $launcherRefs = @('mscorlib.dll', 'System.dll') | ForEach-Object { "-r:$fw\$_" }
         Compile $launcherExe (Join-Path $root 'launcher\launcher.manifest') $launcherSrc $launcherRefs @("-win32icon:$ico")
     } finally {
