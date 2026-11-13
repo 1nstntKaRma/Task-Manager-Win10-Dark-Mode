@@ -295,7 +295,9 @@ function Invoke-Build {
         $tmp = Join-Path $obj 'TaskManagerDark.noicon.exe'
         # first pass without an icon, then let the app draw its own icon (always redrawn so icon changes apply)
         Compile $tmp "$src\app.manifest" $files $refs @()
-        Start-Process -FilePath $tmp -ArgumentList @('--export-icon', $ico) -WindowStyle Hidden -Wait | Out-Null
+        # (Start-Process does not quote arguments: a path with spaces would reach the app as several words)
+        Remove-Item -LiteralPath $ico -Force -ErrorAction SilentlyContinue
+        Start-Process -FilePath $tmp -ArgumentList @('--export-icon', ('"' + $ico + '"')) -WindowStyle Hidden -Wait | Out-Null
         if (-not (Test-Path $ico)) { throw 'Icon export failed.' }
         Compile $exe "$src\app.manifest" $files $refs @("-win32icon:$ico")
 
