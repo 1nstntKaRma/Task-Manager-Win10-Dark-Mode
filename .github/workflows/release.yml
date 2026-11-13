@@ -32,7 +32,9 @@ jobs:
         run: |
           $v = (Get-Content VERSION -TotalCount 1).Trim()
           if ("v$v" -ne '${{ github.ref_name }}') { throw "Tag ${{ github.ref_name }} does not match VERSION ($v)." }
+          $p = [version]$v
           "VERSION=$v" >> $env:GITHUB_ENV
+          "VERSION_STAMP=$($p.Major).$($p.Minor).$([Math]::Max(0, $p.Build)).0" >> $env:GITHUB_ENV
 
       - name: Build
         shell: powershell
@@ -60,6 +62,8 @@ jobs:
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 3600
           output-artifact-directory: bin
+          parameters: |
+            version: "${{ env.VERSION_STAMP }}"
 
       - name: Check the signatures
         if: env.SIGN == 'true'
