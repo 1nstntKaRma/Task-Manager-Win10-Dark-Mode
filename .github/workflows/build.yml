@@ -1,0 +1,39 @@
+# Builds both programs on every push and pull request, exactly as build.ps1 does on a user's PC.
+# The built exes are kept as a workflow artifact for 14 days.
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build (no system changes)
+        shell: powershell
+        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\build.ps1 -Shell Cancel
+
+      - name: Check the version stamp
+        shell: powershell
+        run: |
+          $v = [version]((Get-Content VERSION -TotalCount 1).Trim())
+          $want = "$($v.Major).$($v.Minor).$([Math]::Max(0, $v.Build)).0"
+          foreach ($f in 'bin\TaskManagerDark.exe', 'bin\TaskManagerDarkLauncher.exe') {
+            $got = (Get-Item $f).VersionInfo.FileVersion
+            if ($got -ne $want) { throw "$f has version $got, VERSION says $want" }
+            "$f  $got  $((Get-FileHash $f).Hash)"
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: TaskManagerDark-${{ github.sha }}
+          path: bin/*.exe
+          retention-days: 14
