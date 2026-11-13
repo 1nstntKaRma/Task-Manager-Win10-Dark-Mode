@@ -27,6 +27,13 @@ namespace TaskManagerDark
         public static DataEngine Engine;
         public static bool NoEtw, Replace, FromLauncher, Offscreen, TestTray;
         public static int StartTab = -1;
+        /// <summary>
+        /// Started by the elevated scheduled task, or running as the installed copy: only Task Manager's own switches
+        /// are honored. Anyone can run that task with any arguments, so the test hook, a different settings folder or
+        /// the icon export must never be reachable through it.
+        /// </summary>
+        public static bool Restricted;
+        public const string FromTaskSwitch = "--from-task";
         public static string ExePath => Assembly.GetExecutingAssembly().Location;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetPropW")] static extern IntPtr GetProp(IntPtr hwnd, string name);
@@ -37,7 +44,8 @@ namespace TaskManagerDark
             Thread.CurrentThread.Name = "UI";
             StartupLog.Begin();
             FastConfig.Install();
-            if (args.Length == 2 && args[0] == "--export-icon") return ExportIcon(args[1]);
+            Restricted = IsRestrictedStart(args);
+            if (!Restricted && args.Length == 2 && args[0] == "--export-icon") return ExportIcon(args[1]);
             var rest = ParseArgs(args);
             ActivateMessage = Sys.RegisterWindowMessage(ActivateMessageName);
 
@@ -96,8 +104,15 @@ namespace TaskManagerDark
             {
                 var a = args[i];
                 if (i == 0 && a.EndsWith("taskmgr.exe", StringComparison.OrdinalIgnoreCase)) continue;
+                if (Restricted && !AllowedWhenRestricted(a))
+                {
+                    if (a.StartsWith("--", StringComparison.Ordinal)) ErrorLog.Note("Startup", "Ignored \"" + a + "\": the installed copy only accepts /startup, --tab=, --replace and --from-launcher.");
+                    rest.Add(a);
+                    continue;
+                }
                 switch (a.ToLowerInvariant())
                 {
+                    case FromTaskSwitch: continue;
                     case "--test-hook": TestHook.Enabled = true; continue;
                     case "--no-etw": NoEtw = true; continue;
                     case "--offscreen": Offscreen = true; continue;
@@ -115,6 +130,25 @@ namespace TaskManagerDark
                 rest.Add(a);
             }
             return rest;
+        }
+
+        static bool AllowedWhenRestricted(string a)
+        {
+            var s = a.ToLowerInvariant();
+            return s == FromTaskSwitch || s == "/startup" || s == "--replace" || s == "--from-launcher" || s.StartsWith("--tab=", StringComparison.Ordinal);
+        }
+
+        /// <summary>The scheduled task passes <see cref="FromTaskSwitch"/> first; the installed copy is restricted however it was started.</summary>
+        static bool IsRestrictedStart(string[] args)
+        {
+            foreach (var a in args) if (a.Equals(FromTaskSwitch, StringComparison.OrdinalIgnoreCase)) return true;
+            try
+            {
+                string dir = Path.GetFullPath(Path.GetDirectoryName(ExePath)).TrimEnd('\\');
+                string installed = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "TaskManagerDark")).TrimEnd('\\');
+                return dir.Equals(installed, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex) { ErrorLog.Write("IsRestrictedStart", ex); return true; }   // unsure: fail closed
         }
 
         public static IntPtr FindRunningWindow()
