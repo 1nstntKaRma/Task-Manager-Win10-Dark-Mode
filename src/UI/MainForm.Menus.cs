@@ -37,6 +37,8 @@ namespace TaskManagerDark
                 MenuItem.Check("&Show full account name", () => ShowFullAccountName, () => { ShowFullAccountName = !ShowFullAccountName; SaveSettings(); foreach (var p in Pages) p?.DataUpdated(); }),
                 MenuItem.Sep(),
                 MenuItem.Check("Show history for all &processes", () => ShowHistoryAllProcesses, () => { ShowHistoryAllProcesses = !ShowHistoryAllProcesses; SaveSettings(); (Pages[2] as AppHistoryPage)?.Reload(); }),
+                MenuItem.Sep(),
+                new MenuItem(Strings.AboutMenu, () => AboutDialog.ShowAsync(this)),
             };
         }
 

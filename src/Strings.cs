@@ -167,5 +167,9 @@ namespace TaskManagerDark
         public const string EfficiencyTurnOn = "Turn on Efficiency mode", DontShowAgain = "Don't show again", UnableEfficiency = "Unable to change Efficiency mode";
         public const string GraphTimeSpan = "Graph &time span", TimeSpanStandard = "&Standard", TimeSpan5 = "&5 minutes", TimeSpan10 = "&10 minutes";
         public const string Minutes5 = "5 minutes", Minutes10 = "10 minutes";
+        public const string AboutMenu = "A&bout", AboutTitle = "About", ProductName = "Task Manager - Dark Mode";
+        public const string AboutDescription = "A dark recreation of the Windows 10 Task Manager.";
+        public const string AboutProjectPage = "Project page", AboutCheckUpdates = "Check for updates";
+        public const string AboutFooter = "© 2026 1nstntKaRma · MIT License\nNot affiliated with Microsoft.";
     }
 }
