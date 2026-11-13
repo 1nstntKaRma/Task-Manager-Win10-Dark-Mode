@@ -103,7 +103,7 @@ function Start-ExitCountdown([int]$seconds = 3, [string]$color = 'Gray') {
 
 function Exit-Session([int]$code = 0) {
     if (Test-Path -LiteralPath $TempRoslynDir) { Remove-Item -LiteralPath $TempRoslynDir -Recurse -Force -ErrorAction SilentlyContinue }
-    if (Test-Interactive -and -not $Elevated -and $Host.Name -eq 'ConsoleHost') {
+    if ((Test-Interactive) -and -not $Elevated -and $Host.Name -eq 'ConsoleHost') {
         try {
             $tempRoot = [System.IO.Path]::GetTempPath().TrimEnd('\')
             $cleanCmd = ""
