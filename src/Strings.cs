@@ -157,5 +157,15 @@ namespace TaskManagerDark
         public const string DedicatedGpuMemUsage = "Dedicated GPU memory usage", SharedGpuMemUsage = "Shared GPU memory usage";
         public const string Seconds60 = "60 seconds", Seconds30 = "30 seconds", Minutes4 = "4 minutes", Paused = "Paused";
         public const string Yes = "Yes", No = "No";
+
+        // not in the Windows 10 Task Manager (suspend / efficiency mode follow Resource Monitor and Windows 11 wording)
+        public const string Suspend = "S&uspend", Resume = "Res&ume", SuspendProcess = "S&uspend process", ResumeProcess = "Res&ume process";
+        public const string UnableSuspend = "Unable to suspend process", UnableResume = "Unable to resume process";
+        public const string EfficiencyModeMenu = "Efficienc&y mode", EfficiencyMode = "Efficiency mode";
+        public const string EfficiencyQuestion = "Turn on Efficiency mode?";
+        public const string EfficiencyWarning = "Efficiency mode lowers the process priority and asks Windows to run it in the most power-efficient way. Some programs may run slowly or become unstable.";
+        public const string EfficiencyTurnOn = "Turn on Efficiency mode", DontShowAgain = "Don't show again", UnableEfficiency = "Unable to change Efficiency mode";
+        public const string GraphTimeSpan = "Graph &time span", TimeSpanStandard = "&Standard", TimeSpan5 = "&5 minutes", TimeSpan10 = "&10 minutes";
+        public const string Minutes5 = "5 minutes", Minutes10 = "10 minutes";
     }
 }

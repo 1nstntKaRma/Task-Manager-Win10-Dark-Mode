@@ -78,6 +78,7 @@ namespace TaskManagerDark
             _list.SortColumn = "name";
             _list.CellOf = (r, c) => { var p = (ProcInfo)r.Tag; var col = _cols[c.Index]; return Cell.Of(col.Text(p)); };
             _list.SearchTextOf = r => ((ProcInfo)r.Tag).Name;
+            _list.FilterTextOf = r => { var p = (ProcInfo)r.Tag; return p.Name + "\n" + p.Pid + "\n" + UserName(p) + "\n" + Description(p); };
             _list.SortRequested += c => { ToggleSort(_list, c, false); Rebuild(); SaveSettings(); };
             _list.ColumnsChanged += () => { SaveSettings(); UpdateWants(); };
             _list.SelectionChanged += () => Main.UpdateCommandBar();
@@ -215,6 +216,22 @@ namespace TaskManagerDark
 
         void EndTask() { var sel = Selected; if (sel.Count > 0) Actions.EndProcess(Main, sel); }
 
+        MenuItem SuspendItem()
+        {
+            var sel = Selected;
+            if (sel.Count > 0 && sel.TrueForAll(Actions.IsSuspended)) return new MenuItem(Strings.ResumeProcess, () => Actions.Suspend(Main, sel, true));
+            return new MenuItem(Strings.SuspendProcess, () => Actions.Suspend(Main, sel, false), () => sel.Exists(Actions.CanPause));
+        }
+
+        MenuItem EfficiencyItem()
+        {
+            var sel = Selected;
+            bool on = sel.Count > 0 && sel.TrueForAll(Actions.IsEfficient);
+            var m = MenuItem.Check(Strings.EfficiencyModeMenu, () => on, () => Actions.SetEfficiency(Main, sel, !on));
+            m.Enabled = () => sel.Exists(Actions.CanPause);
+            return m;
+        }
+
         void OnRowMenu(ListRow row, Point screen)
         {
             if (row == null) return;
@@ -237,6 +254,8 @@ namespace TaskManagerDark
                 // Taskmgr menu #30200 (CPU Context)
                 new MenuItem("&End task", EndTask) { Id = 30400 },
                 new MenuItem("End process &tree", () => Actions.EndProcessTree(Main, Selected)) { Id = 30401 },
+                SuspendItem(),
+                EfficiencyItem(),
                 MenuItem.Sep(),
                 new MenuItem("Set &priority", null, () => single) { Sub = pri, Id = 30494 },
                 new MenuItem("Set a&ffinity", () => AffinityDialog.ShowAsync(Main, p), () => single && p.Pid > 4) { Id = 30410 },

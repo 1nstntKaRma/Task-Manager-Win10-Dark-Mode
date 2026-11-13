@@ -27,6 +27,7 @@ namespace TaskManagerDark
             _list.SortColumn = "name";
             _list.CellOf = CellOf;
             _list.SearchTextOf = r => ((SvcInfo)r.Tag).Name;
+            _list.FilterTextOf = r => { var s = (SvcInfo)r.Tag; return s.Name + "\n" + s.DisplayName + "\n" + (s.Pid != 0 ? s.Pid.ToString() : "") + "\n" + s.Group; };
             _list.SortRequested += c => { ToggleSort(_list, c, false); Rebuild(); SaveSettings(); };
             _list.ColumnsChanged += SaveSettings;
             _list.SelectionChanged += () => Main.UpdateCommandBar();

@@ -167,5 +167,33 @@ namespace TaskManagerDark
             }
             g.SmoothingMode = old;
         }
+
+        /// <summary>Magnifier for the filter button and field.</summary>
+        public static void Magnifier(Graphics g, RectangleF r, Color c)
+        {
+            var old = g.SmoothingMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float s = Math.Min(r.Width, r.Height), d = s * 0.62f;
+            using (var pen = new Pen(c, Math.Max(1.1f, s / 9f)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                g.DrawEllipse(pen, r.X + s * 0.06f, r.Y + s * 0.06f, d, d);
+                float k = r.X + s * 0.06f + d * 0.853f;
+                g.DrawLine(pen, k, r.Y + s * 0.06f + d * 0.853f, r.X + s * 0.94f, r.Y + s * 0.94f);
+            }
+            g.SmoothingMode = old;
+        }
+
+        /// <summary>Thin "x" for clear buttons.</summary>
+        public static void Cross(Graphics g, RectangleF r, Color c)
+        {
+            var old = g.SmoothingMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(c, Math.Max(1.1f, r.Width / 8f)) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            {
+                g.DrawLine(pen, r.X, r.Y, r.Right, r.Bottom);
+                g.DrawLine(pen, r.Right, r.Y, r.X, r.Bottom);
+            }
+            g.SmoothingMode = old;
+        }
     }
 }

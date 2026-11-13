@@ -293,6 +293,7 @@ namespace TaskManagerDark
                     case "quit": f.Close(); break;
                     case "pview": (f.GetPage(1) as PerformancePage)?.Test(arg); Application.DoEvents(); break;
                     case "clip": sb.AppendLine((f.GetPage(1) as PerformancePage)?.LastCopied ?? "(none)"); break;
+                    case "listclip": sb.AppendLine(CurrentList(f)?.LastCopied ?? "(none)"); break;
                     case "eval": sb.AppendLine(Eval(f, arg)); break;
                     case "proc":   // live numbers of processes whose name starts with arg
                         foreach (var p in f.Data.Procs)

@@ -42,6 +42,7 @@ namespace TaskManagerDark
             for (int i = 0; i < _list.Columns.Count; i++) _list.Columns[i].Index = i;
             _list.CellOf = CellOf;
             _list.SearchTextOf = r => r.Tag is StartupItem it ? it.Name : (r as ProcRow)?.Proc.DisplayName;
+            _list.FilterTextOf = r => r.Tag is StartupItem it ? it.Name + "\n" + it.Publisher + "\n" + it.Command : r is ProcRow pr ? pr.Proc.DisplayName + "\n" + pr.Proc.Name + "\n" + pr.Proc.Pid : null;
             _list.SortRequested += c => { ToggleSort(_list, c, false); Rebuild(); SaveSettings(); };
             _list.ColumnsChanged += SaveSettings;
             _list.SelectionChanged += () => Main.UpdateCommandBar();

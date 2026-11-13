@@ -56,6 +56,8 @@ namespace TaskManagerDark
         public readonly List<ListColumn> Columns = new List<ListColumn>();
         public Func<ListRow, ListColumn, Cell> CellOf;
         public Func<ListRow, string> SearchTextOf;
+        /// <summary>What the filter (Ctrl+F) matches for a row: name, PID, publisher... null: the list cannot be filtered.</summary>
+        public Func<ListRow, string> FilterTextOf;
         public bool TallHeader;            // Processes / Users / Startup / App history style
         public bool MultiSelect;
         public bool ShowExpandos = true;
@@ -102,6 +104,11 @@ namespace TaskManagerDark
         int _repeatPart;
         string _typeAhead = "";
         long _typeAheadTick;
+        // filter: rows that match, rows shown because something below them matches (opened to show it), group counts
+        string _filter = "";
+        readonly HashSet<ListRow> _matched = new HashSet<ListRow>(), _included = new HashSet<ListRow>();
+        readonly HashSet<string> _forcedOpen = new HashSet<string>(StringComparer.Ordinal);
+        readonly Dictionary<string, int> _groupShown = new Dictionary<string, int>(StringComparer.Ordinal);
 
         public TreeList()
         {
@@ -157,13 +164,63 @@ namespace TaskManagerDark
             Invalidate();
         }
 
+        /// <summary>Shows only rows whose <see cref="FilterTextOf"/> contains the text (and the rows above them).</summary>
+        public string Filter
+        {
+            get => _filter;
+            set
+            {
+                value = value?.Trim() ?? "";
+                if (value == _filter) return;
+                _filter = value;
+                _scrollY = 0;
+                RebuildFlat();
+                Invalidate();
+            }
+        }
+
+        public bool Filtering => _filter.Length > 0 && FilterTextOf != null;
+
         void RebuildFlat()
         {
             _flat.Clear(); _rowY.Clear();
             int y = 0;
-            foreach (var r in _roots) AddFlat(r, null, ref y);
+            if (Filtering)
+            {
+                _matched.Clear(); _included.Clear(); _forcedOpen.Clear(); _groupShown.Clear();
+                foreach (var r in _roots) MarkFiltered(r);
+                foreach (var r in _roots) AddFiltered(r, null, ref y);
+            }
+            else foreach (var r in _roots) AddFlat(r, null, ref y);
             _contentH = y;
             UpdateScrollBars();
+        }
+
+        /// <summary>Marks rows that match and rows with a match somewhere below; true when this row is shown.</summary>
+        bool MarkFiltered(ListRow r)
+        {
+            string s = r.IsGroup ? null : FilterTextOf(r);
+            bool self = s != null && s.IndexOf(_filter, StringComparison.CurrentCultureIgnoreCase) >= 0;
+            bool any = self;
+            if (r.Children != null) foreach (var c in r.Children) any |= MarkFiltered(c);
+            if (self) _matched.Add(r);
+            if (any) _included.Add(r);
+            return any;
+        }
+
+        void AddFiltered(ListRow r, ListRow parent, ref int y)
+        {
+            r.Parent = parent;
+            if (!_included.Contains(r)) return;
+            // a matching row looks as usual (its own expansion, all its children)
+            if (_matched.Contains(r)) { AddFlat(r, parent, ref y); return; }
+            // shown only for a match further down: opened to show it, other children left out
+            _flat.Add(r); _rowY.Add(y);
+            y += r.IsGroup ? GroupH : RowH;
+            if (!r.IsGroup) _forcedOpen.Add(r.Key);
+            int shown = 0;
+            foreach (var c in r.Children) { if (_included.Contains(c)) shown++; AddFiltered(c, r, ref y); }
+            if (r.IsGroup) _groupShown[r.Key] = shown;
         }
 
         void AddFlat(ListRow r, ListRow parent, ref int y)
@@ -177,7 +234,14 @@ namespace TaskManagerDark
             else foreach (var c in r.Children) c.Parent = r;
         }
 
-        public bool IsExpanded(ListRow r) => r.IsGroup || _expanded.Contains(r.Key);
+        public bool IsExpanded(ListRow r) => r.IsGroup || _expanded.Contains(r.Key) || (Filtering && _forcedOpen.Contains(r.Key));
+
+        /// <summary>Selects the first row that is not a group heading (Down / Enter from the filter field).</summary>
+        public void SelectFirst()
+        {
+            int i = NextSelectable(-1, 1);
+            if (i >= 0 && i < _flat.Count && !_flat[i].IsGroup) { ClickSelect(_flat[i], false, false); EnsureVisible(_flat[i]); }
+        }
         public void SetExpanded(ListRow r, bool on)
         {
             if (r == null || r.IsGroup || !r.Expandable) return;
@@ -345,8 +409,9 @@ namespace TaskManagerDark
         {
             if (_flat.Count == 0)
             {
-                if (!string.IsNullOrEmpty(EmptyText))
-                    Gdi.Text(hdc, EmptyText, RowFont, new Rectangle(view.X, view.Y + D.S(20), view.Width, D.S(24)), Theme.TextDim, Gdi.Center);
+                string empty = Filtering && _roots.Count > 0 ? "No results for “" + _filter + "”" : EmptyText;
+                if (!string.IsNullOrEmpty(empty))
+                    Gdi.Text(hdc, empty, RowFont, new Rectangle(view.X, view.Y + D.S(20), view.Width, D.S(24)), Theme.TextDim, Gdi.Center);
                 return;
             }
             Native.SaveDC(hdc);
@@ -414,7 +479,14 @@ namespace TaskManagerDark
             if (sel) { Gdi.Fill(hdc, new Rectangle(0, rr.Y, ViewRect.Width, rr.Height), _active || Focused ? Theme.RowSelected : Theme.RowSelectedInactive); }
             var f = GroupFont;
             var tr = new Rectangle(D.S(8) - _scrollX, rr.Y + D.S(10), rr.Width, rr.Height - D.S(17));
-            Gdi.Text(hdc, r.GroupText, f, new Rectangle(tr.X, rr.Y + D.S(6), D.S(600), rr.Height - D.S(6)), Theme.GroupText, Gdi.Left);
+            string text = r.GroupText;
+            // filtered: "Apps (12)" counts the rows still shown
+            if (Filtering && text != null && text.EndsWith(")") && _groupShown.TryGetValue(r.Key, out int shown))
+            {
+                int open = text.LastIndexOf(" (", StringComparison.Ordinal);
+                if (open > 0) text = text.Substring(0, open) + " (" + shown + ")";
+            }
+            Gdi.Text(hdc, text, f, new Rectangle(tr.X, rr.Y + D.S(6), D.S(600), rr.Height - D.S(6)), Theme.GroupText, Gdi.Left);
         }
 
         void PaintHeader(IntPtr hdc)
@@ -465,7 +537,7 @@ namespace TaskManagerDark
                     var r = _flat[i];
                     if (r.IsGroup || !r.Expandable) continue;
                     var er = ExpandoRect(r, y);
-                    bool open = _expanded.Contains(r.Key);
+                    bool open = IsExpanded(r);
                     Draw.Chevron(g, er.X + er.Width / 2f, er.Y + er.Height / 2f, D.F(8), Theme.TextDim, open ? 0 : 2, D.F(1.1f));
                 }
             }
@@ -823,6 +895,9 @@ namespace TaskManagerDark
                 case Keys.A:
                     if (ctrl && MultiSelect) { _selected.Clear(); foreach (var r in _flat) if (!r.IsGroup) _selected.Add(r.Key); Invalidate(); SelectionChanged?.Invoke(); return true; }
                     return false;
+                case Keys.C:
+                    if (ctrl && (k & (Keys.Alt | Keys.Shift)) == 0) { CopySelection(); return true; }
+                    return false;
                 default: return false;
             }
             if (target < 0 || target >= _flat.Count) return true;
@@ -835,6 +910,30 @@ namespace TaskManagerDark
             EnsureVisible(row);
             return true;
         }
+
+        /// <summary>The last text Ctrl+C put on the clipboard (tests read it here).</summary>
+        public string LastCopied;
+
+        /// <summary>Ctrl+C: the selected rows as tab-separated text under a line of column titles (pastes into Excel or a text file).</summary>
+        public void CopySelection()
+        {
+            var rows = SelectedRows;
+            if (rows.Count == 0 || CellOf == null) return;
+            var cols = new List<ListColumn>(VisibleColumns);
+            var sb = new System.Text.StringBuilder();
+            sb.Append(string.Join("\t", cols.ConvertAll(c => c.Title))).Append("\r\n");
+            foreach (var r in rows)
+            {
+                if (r.IsGroup) { sb.Append(r.GroupText).Append("\r\n"); continue; }
+                sb.Append(string.Join("\t", cols.ConvertAll(c => OneLine(CellOf(r, c).Text)))).Append("\r\n");
+            }
+            LastCopied = sb.ToString();
+            if (TestHook.Enabled) return;
+            try { Clipboard.SetText(LastCopied); }
+            catch (Exception ex) { ErrorLog.Write("Copy rows", ex); }
+        }
+
+        static string OneLine(string s) => string.IsNullOrEmpty(s) ? "" : s.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
 
         int NextSelectable(int from, int dir)
         {

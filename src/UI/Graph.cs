@@ -13,7 +13,23 @@ namespace TaskManagerDark
             public Color Color;
             public bool Fill = true, Dashed;
             public Color FillColor;
+            /// <summary>Hover readout: the line's name ("Read", "Send"...; null for a single line) and how its values read.</summary>
+            public string Label;
+            public Func<double, string> Format;
         }
+
+        /// <summary>A drawn graph, kept so the hover readout can find the sample under the mouse.</summary>
+        public sealed class Area
+        {
+            public Rectangle Inner;
+            public Line[] Lines;
+            public float Step;
+        }
+
+        /// <summary>How many updates a graph spans (60 by default; more with a longer Graph history).</summary>
+        public static int Window = 60;
+        /// <summary>Set while a page renders: every graph drawn is added to it.</summary>
+        public static System.Collections.Generic.List<Area> Recorder;
 
         /// <param name="scale">value that maps to the top of the graph</param>
         /// <param name="tick">update counter (the vertical grid lines move with it)</param>
@@ -27,11 +43,12 @@ namespace TaskManagerDark
             var grid = inactive ? Theme.C(0x2A2A2A) : colors.Grid;
             // grid: 10 rows, columns 1/10 of the width that scroll left with every update
             for (int i = 1; i < 10; i++) g.FillRectangle(Theme.Brush(grid), inner.X, inner.Y + inner.Height * i / 10, inner.Width, 1);
-            float step = inner.Width / 59f;
-            int shift = tick % 6;
+            int window = Math.Max(2, Window), every = Math.Max(1, window / 10);
+            float step = inner.Width / (float)(window - 1);
+            int shift = tick % every;
             for (int k = 0; k <= 11; k++)
             {
-                float x = inner.Right - (k * 6 + shift) * step;
+                float x = inner.Right - (k * every + shift) * step;
                 if (x > inner.X && x < inner.Right) g.FillRectangle(Theme.Brush(grid), (int)x, inner.Y, 1, inner.Height);
             }
             if (!inactive && scale > 0)
@@ -41,22 +58,38 @@ namespace TaskManagerDark
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 foreach (var l in lines) if (l?.Data != null) DrawLine(g, inner, l, scale, step);
                 g.ResetClip();
+                Recorder?.Add(new Area { Inner = inner, Lines = lines, Step = step });
             }
             g.SmoothingMode = SmoothingMode.None;
             g.DrawRectangle(Theme.Pen(inactive ? Theme.C(0x444444) : colors.Border), r.X, r.Y, r.Width - 1, r.Height - 1);
             g.SmoothingMode = old;
         }
 
+        /// <summary>The newest <see cref="Window"/> samples; where several fall on one pixel column, only the highest is kept (peaks stay visible, cost stays at the graph's width).</summary>
         static PointF[] Points(Rectangle inner, Series s, double scale, float step)
         {
-            int n = s.Count;
-            var pts = new PointF[n];
+            int n = Math.Min(s.Count, Math.Max(2, Window)), skip = s.Count - n;
+            var pts = new System.Collections.Generic.List<PointF>(Math.Min(n, inner.Width + 2));
+            int lastPx = int.MinValue;
             for (int i = 0; i < n; i++)
             {
-                double v = Math.Max(0, Math.Min(scale, s[i])) / scale;
-                pts[i] = new PointF(inner.Right - 1 - (n - 1 - i) * step, (float)(inner.Bottom - 1 - v * (inner.Height - 1)));
+                double v = Math.Max(0, Math.Min(scale, s[skip + i])) / scale;
+                float x = inner.Right - 1 - (n - 1 - i) * step, y = (float)(inner.Bottom - 1 - v * (inner.Height - 1));
+                int px = (int)x;
+                if (step < 1f && px == lastPx) { var p = pts[pts.Count - 1]; if (y < p.Y) pts[pts.Count - 1] = new PointF(p.X, y); continue; }
+                pts.Add(new PointF(x, y));
+                lastPx = px;
             }
-            return pts;
+            return pts.ToArray();
+        }
+
+        /// <summary>The sample of <paramref name="s"/> drawn at <paramref name="x"/> (null outside the data), and how many updates ago it was taken.</summary>
+        public static float? ValueAt(Area a, Series s, int x, out int ago)
+        {
+            ago = (int)Math.Round((a.Inner.Right - 1 - x) / a.Step);
+            int n = Math.Min(s.Count, Math.Max(2, Window));
+            if (ago < 0 || ago >= n) return null;
+            return s[s.Count - 1 - ago];
         }
 
         static void FillArea(Graphics g, Rectangle inner, Line l, double scale, float step)
