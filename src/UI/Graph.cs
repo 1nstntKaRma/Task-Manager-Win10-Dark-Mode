@@ -24,6 +24,7 @@ namespace TaskManagerDark
             public Rectangle Inner;
             public Line[] Lines;
             public float Step;
+            public int Window;
         }
 
         /// <summary>How many updates a graph spans (60 by default; more with a longer Graph history).</summary>
@@ -58,7 +59,7 @@ namespace TaskManagerDark
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 foreach (var l in lines) if (l?.Data != null) DrawLine(g, inner, l, scale, step);
                 g.ResetClip();
-                Recorder?.Add(new Area { Inner = inner, Lines = lines, Step = step });
+                Recorder?.Add(new Area { Inner = inner, Lines = lines, Step = step, Window = window });
             }
             g.SmoothingMode = SmoothingMode.None;
             g.DrawRectangle(Theme.Pen(inactive ? Theme.C(0x444444) : colors.Border), r.X, r.Y, r.Width - 1, r.Height - 1);
@@ -87,7 +88,7 @@ namespace TaskManagerDark
         public static float? ValueAt(Area a, Series s, int x, out int ago)
         {
             ago = (int)Math.Round((a.Inner.Right - 1 - x) / a.Step);
-            int n = Math.Min(s.Count, Math.Max(2, Window));
+            int n = Math.Min(s.Count, a.Window);
             if (ago < 0 || ago >= n) return null;
             return s[s.Count - 1 - ago];
         }
@@ -96,6 +97,7 @@ namespace TaskManagerDark
         {
             if (l.Data.Count < 2) return;
             var pts = Points(inner, l.Data, scale, step);
+            if (pts.Length < 2) return;   // the first samples of a long span can share one pixel column
             var poly = new PointF[pts.Length + 2];
             Array.Copy(pts, poly, pts.Length);
             poly[pts.Length] = new PointF(pts[pts.Length - 1].X, inner.Bottom);
@@ -107,6 +109,7 @@ namespace TaskManagerDark
         {
             if (l.Data.Count < 2) return;
             var pts = Points(inner, l.Data, scale, step);
+            if (pts.Length < 2) return;
             if (l.Dashed) using (var p = new Pen(l.Color, 1.4f) { DashStyle = DashStyle.Dash }) g.DrawLines(p, pts);
             else using (var p = new Pen(l.Color, 1.4f)) g.DrawLines(p, pts);
         }
