@@ -87,7 +87,9 @@ jobs:
           [IO.Compression.ZipFile]::CreateFromDirectory($stage, (Join-Path $PWD $zip))
           Copy-Item bin\TaskManagerDark.exe, bin\TaskManagerDarkLauncher.exe .
           $files = $zip, 'TaskManagerDark.exe', 'TaskManagerDarkLauncher.exe'
-          $files | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant())  $_" } | Set-Content SHA256SUMS.txt -Encoding ascii
+          # LF line endings, so `sha256sum -c SHA256SUMS.txt` works everywhere (build.ps1 reads either)
+          $lines = $files | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant())  $_" }
+          [IO.File]::WriteAllText((Join-Path $PWD 'SHA256SUMS.txt'), ($lines -join "`n") + "`n")
           Get-Content SHA256SUMS.txt
 
       - uses: actions/attest-build-provenance@v4
@@ -109,5 +111,5 @@ jobs:
             '', 'Built on GitHub Actions from this tag. Verify with:',
             '```', "gh attestation verify TaskManagerDark-v$env:VERSION.zip --repo ${{ github.repository }}", '```')
           Add-Content $notes $tail
-          gh release create '${{ github.ref_name }}' "TaskManagerDark-v$env:VERSION.zip" SHA256SUMS.txt TaskManagerDark.exe `
+          gh release create '${{ github.ref_name }}' "TaskManagerDark-v$env:VERSION.zip" SHA256SUMS.txt TaskManagerDark.exe TaskManagerDarkLauncher.exe `
             --title "Task Manager - Dark Mode v$env:VERSION" --notes-file $notes --verify-tag
