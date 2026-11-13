@@ -80,14 +80,14 @@ Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brin
 
 ## Features
 
-- **Processes:** Apps, Background, and Windows processes; heat-map shading, per-column totals, sorting, type-to-search, expandable *Service Host* and app window rows, resource values/percentages, and optional Type, Publisher, PID, Process name, and Command line columns. Both **Fewer details** and **More details** views are supported.
-- **Performance:** Real-time graphs and metrics for CPU (overall, logical cores, NUMA, kernel times), Memory (with composition bar), Disks (SSD/HDD without waking sleeping drives), Network adapters (with Wi-Fi SSID/signal), and GPUs (per-engine graphs, VRAM, temperature, driver/DirectX info). Supports graph summary view (double-click) and sidebar summary view.
+- **Processes:** Apps, Background, and Windows processes; heat-map shading, per-column totals, sorting, type-to-search, expandable *Service Host* and app window rows, resource values/percentages, and optional Type, Publisher, PID, Process name, and Command line columns. Right-click a process to **Suspend / Resume** it or turn on **Efficiency mode**. Both **Fewer details** and **More details** views are supported.
+- **Performance:** Real-time graphs and metrics for CPU (overall, logical cores, NUMA, kernel times), Memory (with composition bar), Disks (SSD/HDD without waking sleeping drives), Network adapters (with Wi-Fi SSID/signal), and GPUs (per-engine graphs, VRAM, temperature, driver/DirectX info). Supports graph summary view (double-click), sidebar summary view, a **Graph time span** of the standard 60 updates, 5 minutes, or 10 minutes (right-click a graph), and a hover readout showing the exact value and how long ago it was measured.
 - **App history:** SRUM usage stats (CPU time, Network, Metered network, Tile updates, Downloads/Uploads) with *Delete usage history*.
 - **Startup:** 64/32-bit `HKCU`/`HKLM` Run keys and Startup folders, Enable/Disable (`StartupApproved`), Startup impact, and Last BIOS time—enumerated asynchronously so spun-down HDDs never stall the UI.
 - **Users:** Per-session resource usage and processes, Disconnect, Sign off, Send message, and Connect.
-- **Details:** All standard columns, End task / process tree, Set priority & affinity, Analyze wait chain, UAC virtualization, Create dump file, Open file location, Search online, dark Properties sheet, and Go to service(s).
+- **Details:** All standard columns, End task / process tree, Set priority & affinity, Analyze wait chain, Suspend / Resume process, Efficiency mode, UAC virtualization, Create dump file, Open file location, Search online, dark Properties sheet, and Go to service(s).
 - **Services:** Start, Stop, Restart, Open Services (`services.msc`), Search online, and Go to details.
-- **Menus, Tray & Shortcuts:** *Run new task* (with admin option), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Update speed*, live CPU tray meter, `Ctrl+Tab`, `Delete`, `F5`, and holding `Ctrl` to pause updates. Settings and crash logs are stored in `%APPDATA%\TaskManagerDark`.
+- **Menus, Tray & Shortcuts:** *Run new task* (with admin option), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Update speed*, live CPU tray meter, `Ctrl+Tab`, `Delete`, `F5`, holding `Ctrl` to pause updates, `Ctrl+F` to filter the current tab (the magnifier next to the star; `Esc` clears it), and `Ctrl+C` to copy the selected rows as tab-separated text. Settings and crash logs are stored in `%APPDATA%\TaskManagerDark`.
 
 ---
 
@@ -96,6 +96,7 @@ Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brin
 - **Properties** opens a native dark dialog (*General*, *Digital Signatures*, *Details*) instead of Explorer's light-themed property sheet.
 - **Power usage / trend** are estimated from CPU, GPU, and disk activity; **In use (Compressed)** shows the `Memory Compression` working set.
 - **Provide feedback** is omitted; **File > Run as administrator** is added when running unelevated.
+- **Added beyond Windows 10:** the `Ctrl+F` filter, `Ctrl+C` row copy, *Suspend / Resume*, *Efficiency mode* (EcoQoS plus Low priority, as in Windows 11; unavailable for Windows itself, the desktop shell, and Task Manager so neither can be frozen or slowed), and the longer *Graph time span* with its hover readout.
 - `TaskManagerDark.exe --test-hook` enables automated testing via `WM_COPYDATA` (completely inactive unless `--test-hook` is passed).
 
 ---

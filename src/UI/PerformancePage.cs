@@ -29,6 +29,7 @@ namespace TaskManagerDark
         public int CpuView;            // 0 overall, 1 logical processors, 2 NUMA nodes
         public bool KernelTimes, ShowGraphs = true, GpuMulti = true;
         public readonly int[] GpuEngineSel = { -1, -1, -1, -1 };   // -1: Task Manager's default for that slot
+        public int History;            // Graph time span: 0 standard (60 updates), 1 five minutes, 2 ten minutes
         bool _graphSummary, _sideSummary;
 
         public PerformancePage(MainForm main) : base(main)
@@ -108,7 +109,26 @@ namespace TaskManagerDark
             return idx >= 0 ? idx : Math.Min(Math.Max(0, count - 1), slot);
         }
 
-        public string TimeLabel => Main.UpdateSpeed == 0 ? Strings.Seconds30 : Main.UpdateSpeed == 2 ? Strings.Minutes4 : Main.UpdateSpeed == 3 ? Strings.Paused : Strings.Seconds60;
+        public string TimeLabel =>
+            Main.UpdateSpeed == 3 ? Strings.Paused :
+            History == 1 ? Strings.Minutes5 : History == 2 ? Strings.Minutes10 :
+            Main.UpdateSpeed == 0 ? Strings.Seconds30 : Main.UpdateSpeed == 2 ? Strings.Minutes4 : Strings.Seconds60;
+
+        /// <summary>Updates per graph: 60 as in Task Manager, or as many as fill 5 / 10 minutes at the update speed.</summary>
+        public int HistorySamples
+        {
+            get
+            {
+                if (History == 0) return 60;
+                int ms = MainForm.SpeedMs[Main.UpdateSpeed == 3 ? 1 : Main.UpdateSpeed];   // paused: as at Normal
+                return Math.Max(60, Math.Min(Series.Capacity, (History == 1 ? 300000 : 600000) / ms));
+            }
+        }
+
+        /// <summary>Milliseconds between the samples of a graph (for "12 seconds ago").</summary>
+        public int SampleMs => MainForm.SpeedMs[Main.UpdateSpeed == 3 ? 1 : Main.UpdateSpeed];
+
+        void SetHistory(int h) { History = h; SaveSettings(); _detail.Invalidate(); }
 
         public void ToggleGraphSummary()
         {
@@ -184,6 +204,12 @@ namespace TaskManagerDark
                 items.Add(MenuItem.Sep());
             }
             items.Add(MenuItem.Check("Graph summary vie&w", () => _graphSummary, ToggleGraphSummary));
+            items.Add(MenuItem.Popup(Strings.GraphTimeSpan, new List<MenuItem>
+            {
+                MenuItem.RadioItem(Strings.TimeSpanStandard, () => History == 0, () => SetHistory(0)),
+                MenuItem.RadioItem(Strings.TimeSpan5, () => History == 1, () => SetHistory(1)),
+                MenuItem.RadioItem(Strings.TimeSpan10, () => History == 2, () => SetHistory(2)),
+            }));
             var view = new List<MenuItem>();
             foreach (var x in _items)
             {
@@ -244,6 +270,7 @@ namespace TaskManagerDark
             ShowGraphs = Settings.GetBool("Performance.ShowGraphs", true);
             GpuMulti = Settings.GetBool("Performance.GpuMulti", true);
             for (int i = 0; i < 4; i++) GpuEngineSel[i] = Settings.GetInt("Performance.GpuEngine" + i, -1);
+            History = Math.Max(0, Math.Min(2, Settings.GetInt("Performance.History", 0)));
         }
 
         public override void SaveSettings()
@@ -254,6 +281,7 @@ namespace TaskManagerDark
             Settings.SetBool("Performance.ShowGraphs", ShowGraphs);
             Settings.SetBool("Performance.GpuMulti", GpuMulti);
             for (int i = 0; i < 4; i++) Settings.SetInt("Performance.GpuEngine" + i, GpuEngineSel[i]);
+            Settings.SetInt("Performance.History", History);
         }
 
         public void Test(string what)
@@ -271,6 +299,9 @@ namespace TaskManagerDark
                 case "detailmenu": ShowDetailMenu(PointToScreen(new Point(Width / 2, Height / 2))); break;
                 case "sidemenu": ShowSideMenu(PointToScreen(new Point(40, 40))); break;
                 case "copy": CopyDetails(); break;
+                case "history0": SetHistory(0); break;
+                case "history1": SetHistory(1); break;
+                case "history2": SetHistory(2); break;
                 default:
                     foreach (var it in _items) if (it.Key == what) Select(it);
                     break;
@@ -331,6 +362,7 @@ namespace TaskManagerDark
         static void DrawThumb(Graphics g, Rectangle r, PerfItem it, DataEngine d)
         {
             int tick = d.Tick;
+            Graph.Window = 60;   // thumbnails always show the standard span
             switch (it.Kind)
             {
                 case PerfKind.Cpu: Graph.Draw(g, r, it.Colors, 100, tick, false, new Graph.Line { Data = d.CpuTotal, Color = it.Colors.Line }); break;
@@ -338,7 +370,7 @@ namespace TaskManagerDark
                 case PerfKind.Disk: Graph.Draw(g, r, it.Colors, 100, tick, false, new Graph.Line { Data = it.Disk.Active, Color = it.Colors.Line }); break;
                 case PerfKind.Net:
                     {
-                        double max = Math.Max(it.Net.Send.Max, it.Net.Recv.Max);
+                        double max = Math.Max(it.Net.Send.MaxLast(60), it.Net.Recv.MaxLast(60));
                         bool inactive = it.Net.Last != null && !it.Net.Last.Connected;
                         Graph.Draw(g, r, it.Colors, Graph.BitScale(max), tick, inactive,
                             new Graph.Line { Data = it.Net.Recv, Color = it.Colors.Line },
@@ -412,7 +444,37 @@ namespace TaskManagerDark
         readonly PerformancePage _page;
         readonly List<KeyValuePair<Rectangle, int>> _engineSelectors = new List<KeyValuePair<Rectangle, int>>();
         Rectangle _graphArea;
-        public PerfDetail(PerformancePage page) { _page = page; }
+        // hover readout: the graphs of the last paint, and the graph / sample under the mouse
+        readonly List<Graph.Area> _areas = new List<Graph.Area>();
+        Point _hover = new Point(-1, -1);
+        Rectangle _hoverArea;
+        int _hoverAgo = -1;
+        // at most ~30 hover repaints a second, however fast the mouse moves
+        readonly Timer _hoverThrottle = new Timer { Interval = 33 };
+        Rectangle _hoverPending;
+        public PerfDetail(PerformancePage page)
+        {
+            _page = page;
+            _hoverThrottle.Tick += (s, e) =>
+            {
+                _hoverThrottle.Stop();
+                if (!_hoverPending.IsEmpty) { Invalidate(_hoverPending); _hoverPending = Rectangle.Empty; _hoverThrottle.Start(); }
+            };
+        }
+
+        void InvalidateHover(Rectangle r)
+        {
+            if (r.IsEmpty) return;
+            if (_hoverThrottle.Enabled) { _hoverPending = _hoverPending.IsEmpty ? r : Rectangle.Union(_hoverPending, r); return; }
+            Invalidate(r);
+            _hoverThrottle.Start();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _hoverThrottle.Dispose();
+            base.Dispose(disposing);
+        }
 
         DataEngine Data => _page.D2;
         Font LabelFont => Theme.UiFont(D);
@@ -421,6 +483,16 @@ namespace TaskManagerDark
         Font NameFont => Theme.GetFont(D, 16f, FontStyle.Regular);
 
         protected override void Render(Graphics g, Rectangle clip)
+        {
+            Graph.Window = _page.HistorySamples;
+            _areas.Clear();
+            Graph.Recorder = _areas;
+            try { RenderPage(g); }
+            finally { Graph.Recorder = null; }
+            DrawHover(g);
+        }
+
+        void RenderPage(Graphics g)
         {
             Draw.Fill(g, ClientRectangle, Theme.Surface);
             _engineSelectors.Clear();
@@ -500,7 +572,7 @@ namespace TaskManagerDark
                         {
                             Graph.Draw(g, gr, c, 100, tick, false,
                                 new Graph.Line { Data = Data.CpuTotal, Color = c.Line },
-                                _page.KernelTimes ? new Graph.Line { Data = Data.CpuKernel, Color = Theme.Blend(c.Line, Theme.Surface, 0.35f), FillColor = Theme.KernelFill } : null);
+                                _page.KernelTimes ? new Graph.Line { Data = Data.CpuKernel, Color = Theme.Blend(c.Line, Theme.Surface, 0.35f), FillColor = Theme.KernelFill, Label = "Kernel" } : null);
                             if (!summary) LabelRow(g, new Rectangle(area.X, gr.Bottom, area.Width, lh), time, "0");
                         }
                         break;
@@ -510,7 +582,7 @@ namespace TaskManagerDark
                         int barH = summary ? 0 : D.S(40), compH = summary ? 0 : lh + barH + D.S(10);
                         if (!summary) LabelRow(g, new Rectangle(area.X, area.Y, area.Width, lh), Strings.MemoryUsage, Fmt.Size(Data.Sys.MemTotal));
                         var gr = new Rectangle(area.X, area.Y + lh, area.Width, area.Height - lh * 2 - compH);
-                        Graph.Draw(g, gr, c, Math.Max(1, Data.Sys.MemTotal), tick, false, new Graph.Line { Data = Data.MemUsed, Color = c.Line });
+                        Graph.Draw(g, gr, c, Math.Max(1, Data.Sys.MemTotal), tick, false, new Graph.Line { Data = Data.MemUsed, Color = c.Line, Format = Fmt.Size });
                         if (summary) break;
                         LabelRow(g, new Rectangle(area.X, gr.Bottom, area.Width, lh), time, "0");
                         int y = gr.Bottom + lh + D.S(10);
@@ -527,26 +599,26 @@ namespace TaskManagerDark
                         var g1 = new Rectangle(area.X, area.Y + lh, area.Width, h1);
                         Graph.Draw(g, g1, c, 100, tick, false, new Graph.Line { Data = d.Active, Color = c.Line });
                         LabelRow(g, new Rectangle(area.X, g1.Bottom, area.Width, lh), time, "0");
-                        double scale = Graph.ByteScale(Math.Max(d.Read.Max, d.Write.Max));
+                        double scale = Graph.ByteScale(Math.Max(d.Read.MaxLast(Graph.Window), d.Write.MaxLast(Graph.Window)));
                         int y2 = g1.Bottom + lh + D.S(10);
                         LabelRow(g, new Rectangle(area.X, y2, area.Width, lh), Strings.DiskTransferRate, Graph.ByteScaleText(scale));
                         var g2 = new Rectangle(area.X, y2 + lh, area.Width, h2);
                         Graph.Draw(g, g2, c, scale, tick, false,
-                            new Graph.Line { Data = d.Read, Color = c.Line },
-                            new Graph.Line { Data = d.Write, Color = Theme.DiskWrite, Dashed = true });
+                            new Graph.Line { Data = d.Read, Color = c.Line, Label = "Read", Format = Fmt.Rate },
+                            new Graph.Line { Data = d.Write, Color = Theme.DiskWrite, Dashed = true, Label = "Write", Format = Fmt.Rate });
                         LabelRow(g, new Rectangle(area.X, g2.Bottom, area.Width, lh), time, "0");
                         break;
                     }
                 case PerfKind.Net:
                     {
                         var n = it.Net;
-                        double scale = Graph.BitScale(Math.Max(n.Send.Max, n.Recv.Max));
+                        double scale = Graph.BitScale(Math.Max(n.Send.MaxLast(Graph.Window), n.Recv.MaxLast(Graph.Window)));
                         bool inactive = n.Last != null && !n.Last.Connected;
                         if (!summary) LabelRow(g, new Rectangle(area.X, area.Y, area.Width, lh), Strings.Throughput, Graph.BitScaleText(scale));
                         var gr = new Rectangle(area.X, area.Y + lh, area.Width, area.Height - lh * 2);
                         Graph.Draw(g, gr, c, scale, tick, inactive,
-                            new Graph.Line { Data = n.Recv, Color = c.Line },
-                            new Graph.Line { Data = n.Send, Color = Theme.NetSend, Dashed = true });
+                            new Graph.Line { Data = n.Recv, Color = c.Line, Label = "Receive", Format = Fmt.Bits },
+                            new Graph.Line { Data = n.Send, Color = Theme.NetSend, Dashed = true, Label = "Send", Format = Fmt.Bits });
                         if (!summary) LabelRow(g, new Rectangle(area.X, gr.Bottom, area.Width, lh), time, "0");
                         break;
                     }
@@ -576,7 +648,7 @@ namespace TaskManagerDark
                 else
                     Graph.Draw(g, r, c, 100, tick, false,
                         new Graph.Line { Data = Data.PerCpu[i], Color = c.Line },
-                        _page.KernelTimes ? new Graph.Line { Data = Data.PerCpuKernel[i], Color = Theme.Blend(c.Line, Theme.Surface, 0.35f), FillColor = Theme.KernelFill } : null);
+                        _page.KernelTimes ? new Graph.Line { Data = Data.PerCpuKernel[i], Color = Theme.Blend(c.Line, Theme.Surface, 0.35f), FillColor = Theme.KernelFill, Label = "Kernel" } : null);
             }
         }
 
@@ -654,11 +726,11 @@ namespace TaskManagerDark
             int mh = (memH - D.S(10) - lh * 2 - D.S(8)) / 2;
             LabelRow(g, new Rectangle(area.X, y, area.Width, lh), Strings.DedicatedGpuMemUsage, Fmt.Size(gpu.Static.DedicatedLimit));
             var m1 = new Rectangle(area.X, y + lh, area.Width, mh);
-            Graph.Draw(g, m1, c, Math.Max(1, gpu.Static.DedicatedLimit), tick, false, new Graph.Line { Data = gpu.Dedicated, Color = c.Line });
+            Graph.Draw(g, m1, c, Math.Max(1, gpu.Static.DedicatedLimit), tick, false, new Graph.Line { Data = gpu.Dedicated, Color = c.Line, Format = Fmt.Size });
             int y2 = m1.Bottom + D.S(8);
             LabelRow(g, new Rectangle(area.X, y2, area.Width, lh), Strings.SharedGpuMemUsage, Fmt.Size(gpu.Static.SharedLimit));
             var m2 = new Rectangle(area.X, y2 + lh, area.Width, mh);
-            Graph.Draw(g, m2, c, Math.Max(1, gpu.Static.SharedLimit), tick, false, new Graph.Line { Data = gpu.Shared, Color = c.Line });
+            Graph.Draw(g, m2, c, Math.Max(1, gpu.Static.SharedLimit), tick, false, new Graph.Line { Data = gpu.Shared, Color = c.Line, Format = Fmt.Size });
         }
 
         // ------------------------------------------------------------ info blocks
@@ -896,9 +968,74 @@ namespace TaskManagerDark
             if (e.Button == MouseButtons.Left && (_graphArea.Contains(e.Location) || _page.GraphSummary)) _page.ToggleGraphSummary();
         }
 
+        // ------------------------------------------------------------ hover readout
+        /// <summary>A marker on the sample under the mouse with its value(s) and how long ago it was taken.</summary>
+        void DrawHover(Graphics g)
+        {
+            var a = _hover.X < 0 ? null : _areas.Find(x => x.Inner.Contains(_hover));
+            _hoverArea = a?.Inner ?? Rectangle.Empty;
+            _hoverAgo = -1;
+            if (a == null) return;
+            _hoverAgo = (int)Math.Round((a.Inner.Right - 1 - _hover.X) / a.Step);
+            var parts = new List<string>();
+            foreach (var l in a.Lines)
+            {
+                if (l?.Data == null) continue;
+                var v = Graph.ValueAt(a, l.Data, _hover.X, out _);
+                if (v == null) continue;
+                var fmt = l.Format ?? new Func<double, string>(Fmt.Pct1);
+                parts.Add(l.Label != null ? l.Label + " " + fmt(v.Value) : fmt(v.Value));
+            }
+            if (parts.Count == 0) return;
+            int x = a.Inner.Right - 1 - (int)Math.Round(_hoverAgo * a.Step);
+            g.SetClip(a.Inner);
+            g.FillRectangle(Theme.Brush(Color.FromArgb(140, Theme.Text)), x, a.Inner.Y, 1, a.Inner.Height);
+            parts.Add(AgoText(_hoverAgo));
+            string text = string.Join("  ·  ", parts);
+            var f = Theme.SmallFont(D);
+            var sz = Draw.Measure(text, f);
+            int bw = sz.Width + D.S(12), bh = sz.Height + D.S(6);
+            int bx = x + D.S(8);
+            if (bx + bw > a.Inner.Right - D.S(2)) bx = x - D.S(8) - bw;
+            var br = new Rectangle(Math.Max(a.Inner.X + D.S(2), bx), a.Inner.Y + D.S(4), bw, bh);
+            Draw.Fill(g, br, Theme.Popup);
+            Draw.Rect(g, br, Theme.PopupBorder);
+            Draw.Text(g, text, f, br, Theme.Text, Draw.TextCenter);
+            g.ResetClip();
+        }
+
+        string AgoText(int ago)
+        {
+            if (_page.MainWindow.UpdateSpeed == 3 && ago == 0) return Strings.Paused;
+            if (ago <= 0) return "now";
+            double s = ago * _page.SampleMs / 1000.0;
+            if (s < 60) return s.ToString(s % 1 != 0 ? "0.0" : "0") + " s ago";
+            int m = (int)(s / 60), rest = (int)Math.Round(s - m * 60);
+            return rest == 0 ? m + " min ago" : m + " min " + rest + " s ago";
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _hover = new Point(-1, -1);
+            _hoverPending = Rectangle.Empty;
+            if (!_hoverArea.IsEmpty) Invalidate(_hoverArea);
+        }
+
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            // hover readout: repaint only when the graph or the sample under the mouse changes
+            var a = _areas.Find(x => x.Inner.Contains(e.Location));
+            _hover = a != null ? e.Location : new Point(-1, -1);
+            int ago = a != null ? (int)Math.Round((a.Inner.Right - 1 - e.X) / a.Step) : -1;
+            var area = a?.Inner ?? Rectangle.Empty;
+            if (area != _hoverArea || ago != _hoverAgo)
+            {
+                InvalidateHover(_hoverArea);
+                InvalidateHover(area);
+                _hoverArea = area; _hoverAgo = ago;
+            }
             // memory composition tooltips (Taskmgr strings 33610-33617)
             if (_memSegs != null && _memBar.Contains(e.Location) && _page.Selected?.Kind == PerfKind.Memory)
             {

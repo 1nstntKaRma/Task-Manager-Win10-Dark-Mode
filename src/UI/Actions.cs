@@ -107,6 +107,96 @@ namespace TaskManagerDark
             if (error != null) ShowFailure(main, failTitle, denied, error);
         }
 
+        // ------------------------------------------------------------ suspend / resume, efficiency mode
+        /// <summary>
+        /// Never suspended or throttled: Windows itself, the desktop shell and input (a frozen or slowed taskbar, start
+        /// menu or keyboard input cannot be undone from a window you can no longer use), and Task Manager.
+        /// </summary>
+        static readonly HashSet<string> _keepRunning = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "csrss.exe", "wininit.exe", "winlogon.exe", "smss.exe", "services.exe", "lsass.exe", "lsaiso.exe", "dwm.exe", "fontdrvhost.exe",
+            "explorer.exe", "sihost.exe", "ctfmon.exe", "TextInputHost.exe", "ShellExperienceHost.exe", "StartMenuExperienceHost.exe",
+        };
+        // processes suspended here (their threads may report "suspended" a moment later), and priorities replaced by efficiency mode
+        static readonly HashSet<ProcInfo> _suspendedHere = new HashSet<ProcInfo>();
+        static readonly Dictionary<ProcInfo, int> _priorityBefore = new Dictionary<ProcInfo, int>();
+
+        public static bool CanPause(ProcInfo p) =>
+            p != null && !p.Exited && p.Pid > 4 && p.Pid != Sys.GetCurrentProcessId() && !(p.Static?.Critical ?? false) && !_keepRunning.Contains(p.Name);
+        public static bool IsSuspended(ProcInfo p) => p != null && (p.Cur.Suspended || _suspendedHere.Contains(p));
+        public static bool IsEfficient(ProcInfo p) => p?.Static != null && p.Static.Efficiency;
+
+        /// <summary>Suspends (or resumes) the processes; only the ones that are not in that state already, so one Resume undoes one Suspend.</summary>
+        public static void Suspend(MainForm main, List<ProcInfo> procs, bool resume)
+        {
+            _suspendedHere.RemoveWhere(x => x.Exited);
+            string error = null;
+            bool denied = false;
+            foreach (var p in procs)
+            {
+                if (resume ? !IsSuspended(p) : (IsSuspended(p) || !CanPause(p))) continue;
+                IntPtr h = Sys.OpenProcess(Sys.PROCESS_SUSPEND_RESUME, false, p.Pid);
+                if (h == IntPtr.Zero) { int e = Marshal.GetLastWin32Error(); if (e == 5) denied = true; error = error ?? Sys.Win32Message(e); continue; }
+                try
+                {
+                    int status = resume ? Sys.NtResumeProcess(h) : Sys.NtSuspendProcess(h);
+                    if (status < 0) { int e = Sys.RtlNtStatusToDosError(status); if (e == 5) denied = true; error = error ?? Sys.Win32Message(e); continue; }
+                    if (resume) _suspendedHere.Remove(p); else _suspendedHere.Add(p);
+                }
+                finally { Sys.CloseHandle(h); }
+            }
+            main.Data.RefreshNow();
+            if (error != null) ShowFailure(main, resume ? Strings.UnableResume : Strings.UnableSuspend, denied, error);
+        }
+
+        /// <summary>
+        /// Efficiency mode (as in Windows 11): EcoQoS plus Low priority; turning it off hands power throttling back to
+        /// Windows and restores the priority it replaced. Only a menu command: nothing is added to the update path.
+        /// </summary>
+        public static unsafe void SetEfficiency(MainForm main, List<ProcInfo> procs, bool on)
+        {
+            if (on && !Settings.GetBool("EfficiencyMode.NoConfirm", false))
+            {
+                int r = MessageDialog.Show(main, Strings.AppTitle, Strings.EfficiencyQuestion, Strings.EfficiencyWarning,
+                    new[] { Strings.EfficiencyTurnOn, "Cancel" }, 1, MessageDialog.Kind.None, Strings.DontShowAgain, out bool dontAsk);
+                if (r != 0) return;
+                if (dontAsk) { Settings.SetBool("EfficiencyMode.NoConfirm", true); Settings.Save(); }
+            }
+            foreach (var gone in new List<ProcInfo>(_priorityBefore.Keys)) if (gone.Exited) _priorityBefore.Remove(gone);
+            string error = null;
+            bool denied = false;
+            int* info = stackalloc int[3];
+            foreach (var p in procs)
+            {
+                if (!CanPause(p) || IsEfficient(p) == on) continue;
+                IntPtr h = Sys.OpenProcess(Sys.PROCESS_SET_INFORMATION | Sys.PROCESS_QUERY_LIMITED_INFORMATION, false, p.Pid);
+                if (h == IntPtr.Zero) { int e = Marshal.GetLastWin32Error(); if (e == 5) denied = true; error = error ?? Sys.Win32Message(e); continue; }
+                try
+                {
+                    // PROCESS_POWER_THROTTLING_STATE { Version 1, ControlMask, StateMask }: EXECUTION_SPEED (1) on, or back to the system default
+                    info[0] = 1; info[1] = on ? 1 : 0; info[2] = on ? 1 : 0;
+                    if (!Sys.SetProcessInformation(h, 4 /*ProcessPowerThrottling*/, (IntPtr)info, 12))
+                    { int e = Marshal.GetLastWin32Error(); if (e == 5) denied = true; error = error ?? Sys.Win32Message(e); continue; }
+                    int cls = Sys.GetPriorityClass(h);
+                    if (on)
+                    {
+                        if (cls != 0 && cls != 0x40) _priorityBefore[p] = cls;
+                        Sys.SetPriorityClass(h, 0x40 /*IDLE_PRIORITY_CLASS: "Low"*/);
+                    }
+                    else if (cls == 0x40)
+                    {
+                        Sys.SetPriorityClass(h, _priorityBefore.TryGetValue(p, out int before) ? before : 0x20 /*NORMAL*/);
+                        _priorityBefore.Remove(p);
+                    }
+                    if (p.Static != null) p.Static.Efficiency = on;
+                }
+                finally { Sys.CloseHandle(h); }
+            }
+            main.Data.RefreshNow();
+            main.CurrentPage?.DataUpdated();
+            if (error != null) ShowFailure(main, Strings.UnableEfficiency, denied, error);
+        }
+
         public static void ShowFailure(MainForm main, string title, bool denied, string error)
         {
             string text = denied ? (Sys.IsElevated ? Strings.AccessDenied : Strings.NeedAdmin) : error;

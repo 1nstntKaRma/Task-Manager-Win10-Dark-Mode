@@ -143,10 +143,67 @@ namespace TaskManagerDark
         public readonly List<string> Tabs = new List<string>();
         readonly List<Rectangle> _rects = new List<Rectangle>();
         int _selected, _defaultTab, _hot = -1;
-        bool _hotDefault, _downDefault;
+        bool _hotDefault, _downDefault, _hotFilter, _downFilter, _filterAvailable;
         public event Action<int> SelectedChanged;
         public event Action<int> DefaultTabChanged;
         public int PreferredHeight => D.S(25);
+        /// <summary>The filter field (Ctrl+F); folded into a magnifier button next to the star while empty.</summary>
+        public readonly FilterBox Filter = new FilterBox { Visible = false };
+
+        public TabStrip()
+        {
+            Controls.Add(Filter);
+            Filter.Box.LostFocus += (s, e) => { if (!Filter.HasText) CloseFilter(); };
+        }
+
+        /// <summary>The current page has a list that can be filtered.</summary>
+        public bool FilterAvailable
+        {
+            get => _filterAvailable;
+            set
+            {
+                if (value == _filterAvailable) return;
+                _filterAvailable = value;
+                Filter.Visible = value && Filter.HasText;
+                LayoutFilter(); Invalidate();
+            }
+        }
+
+        public void OpenFilter()
+        {
+            if (!_filterAvailable) return;
+            Tips.Hide();
+            Filter.Visible = true;
+            LayoutFilter();
+            Filter.FocusText();
+            Invalidate();
+        }
+
+        public void CloseFilter()
+        {
+            if (!Filter.Visible) return;
+            Filter.Visible = false;
+            Invalidate();
+        }
+
+        public override void SetDpi(int dpi) { base.SetDpi(dpi); Filter.SetDpi(dpi); LayoutFilter(); }
+        protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutFilter(); }
+
+        Rectangle FilterBtnRect => new Rectangle(DefaultBtnRect.X - D.S(23), D.S(2), D.S(19), Height - D.S(4));
+        bool ShowFilterBtn => _filterAvailable && !Filter.Visible && (_rects.Count == 0 || FilterBtnRect.Left > _rects[_rects.Count - 1].Right + D.S(4));
+
+        /// <summary>The field fills the free space between the tabs and the star (at most 220 px; over the last tabs when the window is narrow).</summary>
+        void LayoutFilter()
+        {
+            if (!Filter.Visible) return;
+            LayoutTabs();
+            int right = ShowDefaultBtn ? DefaultBtnRect.X - D.S(4) : Width - D.S(4);
+            int tabsEnd = _rects.Count > 0 ? _rects[_rects.Count - 1].Right + D.S(10) : 0;
+            int left = Math.Max(tabsEnd, right - D.S(220));
+            if (right - left < D.S(140)) left = right - D.S(140);
+            left = Math.Max(D.S(2), left);
+            Filter.Bounds = new Rectangle(left, D.S(2), Math.Max(D.S(40), right - left), Height - D.S(4));
+        }
 
         public int Selected
         {
@@ -225,10 +282,28 @@ namespace TaskManagerDark
                 Color ic = isDef ? Theme.Link : (_hotDefault ? Theme.Text : Theme.TabText);
                 Glyphs.DefaultTabStar(g, ir, isDef, ic);
             }
+
+            if (ShowFilterBtn)
+            {
+                var fr = FilterBtnRect;
+                if (_hotFilter)
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    using (var p = Draw.RoundRect(new RectangleF(fr.X + 0.5f, fr.Y + 0.5f, fr.Width - 1, fr.Height - 1), D.F(3)))
+                    {
+                        g.FillPath(Theme.Brush(_downFilter ? Theme.Pressed : Theme.TabHover), p);
+                        g.DrawPath(Theme.Pen(Theme.Border), p);
+                    }
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                }
+                float isz = D.S(13);
+                Glyphs.Magnifier(g, new RectangleF(fr.X + (fr.Width - isz) / 2f, fr.Y + (fr.Height - isz) / 2f, isz, isz), _hotFilter ? Theme.Text : Theme.TabText);
+            }
         }
 
         int Hit(Point p) { for (int i = 0; i < _rects.Count; i++) if (_rects[i].Contains(p)) return i; return -1; }
         bool HitDefaultBtn(Point p) => ShowDefaultBtn && DefaultBtnRect.Contains(p);
+        bool HitFilterBtn(Point p) => ShowFilterBtn && FilterBtnRect.Contains(p);
 
         void ShowDefaultTip()
         {
@@ -244,16 +319,18 @@ namespace TaskManagerDark
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            bool hd = HitDefaultBtn(e.Location);
-            int h = hd ? -1 : Hit(e.Location);
-            Cursor = hd ? Cursors.Hand : Cursors.Default;
-            if (hd != _hotDefault || h != _hot)
+            bool hd = HitDefaultBtn(e.Location), hf = !hd && HitFilterBtn(e.Location);
+            int h = hd || hf ? -1 : Hit(e.Location);
+            Cursor = hd || hf ? Cursors.Hand : Cursors.Default;
+            if (hd != _hotDefault || hf != _hotFilter || h != _hot)
             {
                 _hotDefault = hd;
+                _hotFilter = hf;
                 _hot = h;
                 Invalidate();
             }
             if (hd) ShowDefaultTip();
+            else if (hf) { var fr = FilterBtnRect; Tips.Request("filter", "Filter (Ctrl+F)", "Show only the rows that match what you type.", PointToScreen(new Point(fr.Left, fr.Bottom + D.S(4))), D.Value); }
             else Tips.Hide();
         }
 
@@ -263,6 +340,7 @@ namespace TaskManagerDark
             _hot = -1;
             _hotDefault = false;
             _downDefault = false;
+            _hotFilter = _downFilter = false;
             Cursor = Cursors.Default;
             Tips.Hide();
             Invalidate();
@@ -278,6 +356,7 @@ namespace TaskManagerDark
                 Invalidate();
                 return;
             }
+            if (HitFilterBtn(e.Location)) { _downFilter = true; Invalidate(); return; }
             int h = Hit(e.Location);
             if (h >= 0) Selected = h;
         }
@@ -285,6 +364,13 @@ namespace TaskManagerDark
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+            if (_downFilter)
+            {
+                _downFilter = false;
+                Invalidate();
+                if (e.Button == MouseButtons.Left && FilterBtnRect.Contains(e.Location)) OpenFilter();
+                return;
+            }
             bool wasDown = _downDefault;
             _downDefault = false;
             if (wasDown)

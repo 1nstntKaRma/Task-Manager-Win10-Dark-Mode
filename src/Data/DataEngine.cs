@@ -7,10 +7,13 @@ using System.Windows.Forms;
 
 namespace TaskManagerDark
 {
-    /// <summary>Fixed-size history of samples for a graph (the graphs show the last 60 updates).</summary>
+    /// <summary>
+    /// Fixed-size history of samples for a graph. The graphs show the last 60 updates by default, or up to 10 minutes
+    /// (Graph history), so 10 minutes at the fastest update speed are kept: 1,200 floats (4.7 KB) per series.
+    /// </summary>
     public sealed class Series
     {
-        public const int Capacity = 60;
+        public const int Capacity = 1200;
         readonly float[] _v = new float[Capacity];
         int _count, _head;
         public int Count => _count;
@@ -18,7 +21,9 @@ namespace TaskManagerDark
         /// <summary>i = 0 is the oldest kept sample, Count-1 the newest.</summary>
         public float this[int i] => _v[(_head - _count + i + Capacity * 2) % Capacity];
         public float Last => _count == 0 ? 0 : this[_count - 1];
-        public float Max { get { float m = 0; for (int i = 0; i < _count; i++) if (this[i] > m) m = this[i]; return m; } }
+        public float Max => MaxLast(_count);
+        /// <summary>Largest of the newest <paramref name="n"/> samples (the part a graph shows).</summary>
+        public float MaxLast(int n) { float m = 0; for (int i = Math.Max(0, _count - n); i < _count; i++) if (this[i] > m) m = this[i]; return m; }
         public void Clear() { _count = 0; _head = 0; }
     }
 

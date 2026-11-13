@@ -174,7 +174,7 @@ namespace TaskManagerDark
                 s.Critical = IsCritical(h, p.Pid);
                 s.DpiAwareness = DpiAwareness(h);
                 s.StackProtection = StackProtection(h);
-                s.PowerThrottling = PowerThrottling(h);
+                s.PowerThrottling = PowerThrottling(h, out s.Efficiency);
             }
             if (s.ImagePath == null) s.ImagePath = ImagePathById(p.Pid);
             if (s.UserName == null) UserFromWinStation(p, s);
@@ -435,14 +435,17 @@ namespace TaskManagerDark
             return strict ? "All modules" : "Compatible modules only";
         }
 
-        static string PowerThrottling(IntPtr h)
+        /// <summary>"Power throttling" column text; <paramref name="efficiency"/>: the process asked for EcoQoS explicitly (efficiency mode).</summary>
+        static string PowerThrottling(IntPtr h, out bool efficiency)
         {
+            efficiency = false;
             IntPtr buf = Marshal.AllocHGlobal(12);
             try
             {
                 *(int*)buf = 1; *(int*)((byte*)buf + 4) = 0; *(int*)((byte*)buf + 8) = 0;
                 if (!Sys.GetProcessInformation(h, 4 /*ProcessPowerThrottling*/, buf, 12)) return "N/A";
                 int control = *(int*)((byte*)buf + 4), state = *(int*)((byte*)buf + 8);
+                efficiency = (control & 1) != 0 && (state & 1) != 0;
                 if ((control & 1) == 0) return "Enabled";            // not overridden: the system decides (throttling allowed)
                 return (state & 1) != 0 ? "Enabled" : "Disabled";
             }

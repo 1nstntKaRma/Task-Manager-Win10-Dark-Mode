@@ -48,6 +48,9 @@ namespace TaskManagerDark
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern int GetApplicationUserModelId(IntPtr h, ref int len, StringBuilder sb);
         [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetProcessMitigationPolicy(IntPtr h, int policy, out long buffer, int size);
         [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetProcessInformation(IntPtr h, int cls, IntPtr buf, int size);
+        [DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetProcessInformation(IntPtr h, int cls, IntPtr buf, int size);
+        [DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr h);
+        [DllImport("ntdll.dll")] public static extern int NtResumeProcess(IntPtr h);
         [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetProcessTimes(IntPtr h, out long create, out long exit, out long kernel, out long user);
         [DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetExitCodeProcess(IntPtr h, out uint code);
         [DllImport("kernel32.dll", SetLastError = true)] public static extern uint WaitForSingleObject(IntPtr h, uint ms);

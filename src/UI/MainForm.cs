@@ -52,6 +52,9 @@ namespace TaskManagerDark
             Tabs.Tabs.AddRange(TabNames);
             Tabs.SelectedChanged += i => ShowPage(i);
             Tabs.DefaultTabChanged += i => { DefaultTab = i; Settings.SetInt("DefaultTab", i); Settings.Save(); };
+            Tabs.Filter.FilterChanged += ApplyFilter;
+            Tabs.Filter.Dismissed += () => { ClearFilter(); CurrentPage?.FocusContent(); };
+            Tabs.Filter.ToList += () => { var l = CurrentPage?.List; CurrentPage?.FocusContent(); l?.SelectFirst(); };
             Bar = new CommandBar();
             Bar.ToggleClicked += () => SetFewerDetails(true);
             Bar.ButtonClicked += () => CurrentPage?.CommandButton();
@@ -112,11 +115,30 @@ namespace TaskManagerDark
             p.Visible = !_fewerDetails;
             if (old != null && old != p) { old.Visible = false; old.SetActive(false); }
             p.SetActive(true);
+            // the filter text follows you between the tabs that have a list
+            Tabs.FilterAvailable = p.List?.FilterTextOf != null;
+            if (p.List != null) p.List.Filter = Tabs.FilterAvailable ? Tabs.Filter.Text : "";
             p.DataUpdated();
             UpdateCommandBar();
             if (!_fewerDetails) p.FocusContent();
             UpdateWantFlags();
         }
+
+        // ================================================================== filter (Ctrl+F)
+        void ApplyFilter()
+        {
+            var l = CurrentPage?.List;
+            if (l != null && l.FilterTextOf != null) l.Filter = Tabs.Filter.Text;
+            UpdateCommandBar();
+        }
+
+        public void ClearFilter()
+        {
+            Tabs.Filter.Text = "";
+            Tabs.CloseFilter();
+        }
+
+        public bool FilterActive => Tabs.Filter.HasText;
 
         public void UpdateCommandBar()
         {
@@ -451,6 +473,12 @@ namespace TaskManagerDark
             }
             switch (keyData)
             {
+                case Keys.Control | Keys.F:
+                    if (!_fewerDetails && !_chromeHidden && Tabs.FilterAvailable) { Popups.CloseAll(); Tabs.OpenFilter(); }
+                    return true;
+                case Keys.Escape:
+                    if (!_fewerDetails && FilterActive && !Popups.AnyOpen) { ClearFilter(); CurrentPage?.FocusContent(); return true; }
+                    break;
                 case Keys.F5: Data.RefreshNow(); return true;
                 case Keys.Control | Keys.Tab:
                     if (!_fewerDetails && !_chromeHidden) ShowPage((_page + 1) % 7);
@@ -483,6 +511,8 @@ namespace TaskManagerDark
             var target = ActiveControl ?? (Control)this;
             var msg = Message.Create(target.Handle, Native.WM_KEYDOWN, (IntPtr)(int)(k & Keys.KeyCode), IntPtr.Zero);
             if (ProcessCmdKey(ref msg, k)) return;
+            // a posted WM_KEYDOWN carries no modifiers (they come from the keyboard state): give lists the whole key
+            if (target is TreeList list && (k & Keys.Modifiers) != 0 && list.HandleKey(k)) return;
             Native.SendMessage(target.Handle, Native.WM_KEYDOWN, (IntPtr)(int)(k & Keys.KeyCode), IntPtr.Zero);
             Native.SendMessage(target.Handle, Native.WM_KEYUP, (IntPtr)(int)(k & Keys.KeyCode), (IntPtr)unchecked((int)0xC0000001));
         }

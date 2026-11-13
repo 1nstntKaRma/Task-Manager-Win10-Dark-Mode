@@ -28,6 +28,7 @@ namespace TaskManagerDark
     {
         public string ImagePath, CommandLine, Description, Company, UserName, UserDomain, UserSid, PackageFullName, AppUserModelId;
         public bool Elevated, Critical, IsImmersive, IsWow64, AccessDenied;
+        public bool Efficiency;            // EcoQoS asked for explicitly (efficiency mode); updated when changed here
         public int Platform;              // 32 or 64, 0 unknown
         public int Virtualization;        // 0 not allowed, 1 disabled, 2 enabled, -1 unknown
         public int Dep;                   // 0 disabled, 1 enabled, 2 enabled (permanent), -1 unknown

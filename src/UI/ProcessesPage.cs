@@ -37,6 +37,7 @@ namespace TaskManagerDark
             for (int i = 0; i < _list.Columns.Count; i++) _list.Columns[i].Index = i;
             _list.CellOf = CellOf;
             _list.SearchTextOf = r => (r as ProcNode)?.Name;
+            _list.FilterTextOf = r => r is ProcNode n ? FilterText(n) : null;
             _list.SortRequested += c => { ToggleSort(_list, c, true); Rebuild(); SaveSettings(); };
             _list.ColumnsChanged += () => SaveSettings();
             _list.SelectionChanged += () => Main.UpdateCommandBar();
@@ -170,11 +171,19 @@ namespace TaskManagerDark
 
         static int KindOrder(NodeKind k) => k == NodeKind.Window ? 2 : k == NodeKind.Service ? 3 : 1;
 
+        /// <summary>The filter matches the row's name, program file, publisher and PID (services: name and display name).</summary>
+        static string FilterText(ProcNode n)
+        {
+            if (n.Kind == NodeKind.Service) return n.Name + "\n" + n.Service?.Name + "\n" + n.Service?.DisplayName;
+            return n.Name + "\n" + n.Proc?.Name + "\n" + n.Proc?.Static?.Company + "\n" + n.Proc?.Pid;
+        }
+
         string StatusText(ProcNode n)
         {
             if (n.Kind != NodeKind.Process) return n.Kind == NodeKind.Window && n.Hung ? Strings.NotResponding : "";
             if (n.Hung) return Strings.NotResponding;
             if (n.Suspended && Main.ShowSuspendedStatus) return Strings.Suspended;
+            if (n.Members.Count > 0 ? n.Members.TrueForAll(Actions.IsEfficient) : Actions.IsEfficient(n.Proc)) return Strings.EfficiencyMode;
             return "";
         }
 
@@ -192,6 +201,7 @@ namespace TaskManagerDark
                         var cell = Cell.Of(s);
                         if (s == Strings.Suspended) cell.Glyph = 1;
                         if (s == Strings.NotResponding) cell.Fore = Theme.C(0xF0A35E);
+                        if (s == Strings.EfficiencyMode) cell.Fore = Theme.TextDim;
                         return cell;
                     }
                 case "publisher": return Cell.Of(n.Kind == NodeKind.Process ? n.Proc?.Static?.Company : "");
@@ -335,6 +345,14 @@ namespace TaskManagerDark
             if (n.IsApp && n.Level == 0) items.Add(new MenuItem("Switch &to", () => SwitchToApp(n)) { Bold = true, Id = 30458 });
             if (explorer) items.Add(new MenuItem("&Restart", () => Actions.RestartExplorer(Main)) { Id = 30450 });
             else items.Add(new MenuItem("&End task", EndSelected) { Id = 30451 });
+            // an app or group row acts on all of its processes, like End task
+            var targets = n.Level == 0 ? n.Members : new List<ProcInfo> { p };
+            if (targets.TrueForAll(Actions.IsSuspended)) items.Add(new MenuItem(Strings.Resume, () => Actions.Suspend(Main, targets, true)));
+            else items.Add(new MenuItem(Strings.Suspend, () => Actions.Suspend(Main, targets, false), () => targets.Exists(Actions.CanPause)));
+            bool efficient = targets.TrueForAll(Actions.IsEfficient);
+            var eff = MenuItem.Check(Strings.EfficiencyModeMenu, () => efficient, () => Actions.SetEfficiency(Main, targets, !efficient));
+            eff.Enabled = () => targets.Exists(Actions.CanPause);
+            items.Add(eff);
             items.Add(MenuItem.Popup("Resource &values", ResourceValuesMenu()));
             items.Add(MenuItem.Sep());
             if (Actions.HasDebugger) items.Add(new MenuItem("&Debug", () => Actions.Debug(Main, p)) { Id = 30452 });

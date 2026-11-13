@@ -33,6 +33,7 @@ namespace TaskManagerDark
             for (int i = 0; i < _list.Columns.Count; i++) _list.Columns[i].Index = i;
             _list.CellOf = CellOf;
             _list.SearchTextOf = r => ((AppUsage)r.Tag).Name;
+            _list.FilterTextOf = r => ((AppUsage)r.Tag).Name;
             _list.SortRequested += c => { ToggleSort(_list, c, false); Rebuild(); SaveSettings(); };
             _list.ColumnsChanged += SaveSettings;
             _list.RowContextMenu += OnRowMenu;
