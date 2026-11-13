@@ -89,7 +89,7 @@ Whenever Windows starts `taskmgr.exe`, `TaskManagerDarkLauncher.exe` either brin
 - **Users:** Per-session resource usage and processes, Disconnect, Sign off, Send message, and Connect.
 - **Details:** All standard columns, End task / process tree, Set priority & affinity, Analyze wait chain, Suspend / Resume process, Efficiency mode, UAC virtualization, Create dump file, Open file location, Search online, dark Properties sheet, and Go to service(s).
 - **Services:** Start, Stop, Restart, Open Services (`services.msc`), Search online, and Go to details.
-- **Menus, Tray & Shortcuts:** *Run new task* (with admin option), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Update speed*, live CPU tray meter, `Ctrl+Tab`, `Delete`, `F5`, holding `Ctrl` to pause updates, `Ctrl+F` to filter the current tab (the magnifier next to the star; `Esc` clears it), and `Ctrl+C` to copy the selected rows as tab-separated text. Settings and crash logs are stored in `%APPDATA%\TaskManagerDark`.
+- **Menus, Tray & Shortcuts:** *Run new task* (with admin option), *Always on top*, *Minimize on use*, *Hide when minimized*, *Set default tab*, *Update speed*, *Options > About* (the running version, which copy runs, and whether it replaces the Windows Task Manager), live CPU tray meter, `Ctrl+Tab`, `Delete`, `F5`, holding `Ctrl` to pause updates, `Ctrl+F` to filter the current tab (the magnifier next to the star; `Esc` clears it), and `Ctrl+C` to copy the selected rows as tab-separated text. Settings and crash logs are stored in `%APPDATA%\TaskManagerDark`.
 
 ---
 
