@@ -2,7 +2,7 @@
 
 > **🛠️⚙️ Windows 10 - Task Manager  Dark Mode ⚡ Full replacement.**
 
-![Version](https://img.shields.io/badge/version-v1.35-blue)
+[![Version](https://img.shields.io/github/v/release/1nstntKaRma/Task-Manager-Win10-Dark-Mode?label=version&color=blue)](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010-0078D6)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8%20(built--in)-512BD4)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -56,7 +56,7 @@ Non-interactive flags: `-Shell Apply`, `-Shell Revert`, `-Shell Cancel`, or `-No
 
 ### Option 2: Download Pre-Built Release
 
-1. Download **`TaskManagerDark-v1.35.zip`** from **[Releases](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
+1. Download **`TaskManagerDark-v<version>.zip`** from the **[latest release](https://github.com/1nstntKaRma/Task-Manager-Win10-Dark-Mode/releases/latest)** and extract it.
 2. Double-click **`Activate Task Manager Dark.cmd`** (or run `build.ps1` and choose **`[1] Apply Dark Mode`**) to set it as your system-wide Task Manager (requests administrator permission once).
 3. To restore the original Windows Task Manager at any time, double-click **`Revert to Windows Task Manager.cmd`** (or choose **`[2] Revert`** in `build.ps1`).
 

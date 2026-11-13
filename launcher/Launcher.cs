@@ -8,8 +8,6 @@ using System.Text;
 [assembly: AssemblyTitle("Task Manager")]
 [assembly: AssemblyDescription("Starts Task Manager - Dark Mode")]
 [assembly: AssemblyProduct("Task Manager - Dark Mode")]
-[assembly: AssemblyVersion("1.35.0.0")]
-[assembly: AssemblyFileVersion("1.35.0.0")]
 
 namespace TaskManagerDarkLauncher
 {
