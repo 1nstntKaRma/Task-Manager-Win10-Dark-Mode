@@ -93,6 +93,10 @@ namespace TaskManagerDark
     /// <summary>Starts the installed scheduled task (Task Scheduler 2.0 COM, late bound) with $(Arg0) parameters.</summary>
     public static class TaskScheduler
     {
+        const int TASK_RUN_USE_SESSION_ID = 0x4;
+        const int SCHED_E_TASK_NOT_RUNNING = unchecked((int)0x8004130B);
+
+        /// <summary>Runs the task in this session; false when it is missing or its program could not start.</summary>
         public static bool RunTask(string name, string args)
         {
             object svc = null;
@@ -108,11 +112,31 @@ namespace TaskManagerDark
                 catch (System.Reflection.TargetInvocationException) { return false; }
                 if (task == null) return false;
                 Sys.AllowSetForegroundWindow(-1);
-                Invoke(task, "Run", args ?? "");
-                return true;
+                // Run() leaves the session to Task Scheduler, which can pick one the user signed out of but a leftover
+                // process keeps alive: no desktop there, so the program ends at once with 0xC0000142.
+                var running = Invoke(task, "RunEx", args ?? "", TASK_RUN_USE_SESSION_ID, System.Diagnostics.Process.GetCurrentProcess().SessionId, "");
+                return !EndedWithError(name, task, running);
             }
             catch (Exception ex) { ErrorLog.Write("TaskScheduler.RunTask", ex); return false; }
             finally { if (svc != null) Marshal.ReleaseComObject(svc); }
+        }
+
+        /// <summary>A program that cannot start ends within milliseconds, and RunEx() has already returned by then.</summary>
+        static bool EndedWithError(string name, object task, object running)
+        {
+            for (int i = 0; running != null && i < 10; i++)
+            {
+                try { Invoke(running, "Refresh"); }
+                catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is COMException com && com.ErrorCode == SCHED_E_TASK_NOT_RUNNING)
+                {
+                    int result = (int)task.GetType().InvokeMember("LastTaskResult", System.Reflection.BindingFlags.GetProperty, null, task, null);
+                    if (result != 0) ErrorLog.Note("TaskScheduler.RunTask", "\\" + name + " ended at once (result 0x" + result.ToString("X8") + ").");
+                    return result != 0;
+                }
+                catch (System.Reflection.TargetInvocationException) { return false; }
+                Thread.Sleep(25);
+            }
+            return false;
         }
 
         public static bool Exists(string name)
